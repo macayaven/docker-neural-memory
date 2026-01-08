@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Neural Memory - Project Guide</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --accent-cyan: #39c5cf;
+            --border-color: #30363d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        header .links {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        header .links a {
+            color: var(--accent-blue);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--accent-blue);
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        header .links a:hover {
+            background: var(--accent-blue);
+            color: var(--bg-primary);
+        }
+
+        section {
+            margin-bottom: 4rem;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        h2 .icon {
+            font-size: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            margin: 1.5rem 0 1rem;
+            color: var(--accent-blue);
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Architecture Diagram */
+        .architecture {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .arch-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .arch-layer {
+            display: flex;
+            gap: 1rem;
+            align-items: stretch;
+            flex-wrap: wrap;
+        }
+
+        .arch-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 1.25rem;
+            border-radius: 8px;
+            border: 2px solid;
+            position: relative;
+        }
+
+        .arch-box.memory {
+            background: rgba(88, 166, 255, 0.1);
+            border-color: var(--accent-blue);
+        }
+
+        .arch-box.ttt {
+            background: rgba(163, 113, 247, 0.1);
+            border-color: var(--accent-purple);
+        }
+
+        .arch-box.mcp {
+            background: rgba(63, 185, 80, 0.1);
+            border-color: var(--accent-green);
+        }
+
+        .arch-box.state {
+            background: rgba(210, 153, 34, 0.1);
+            border-color: var(--accent-orange);
+        }
+
+        .arch-box h4 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .arch-box ul {
+            list-style: none;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .arch-box ul li {
+            padding: 0.25rem 0;
+        }
+
+        .arch-arrow {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+        }
+
+        /* Pipeline */
+        .pipeline {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding: 1rem 0;
+        }
+
+        .pipeline-stage {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .pipeline-box {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .pipeline-box:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .pipeline-box .stage-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .pipeline-box h4 {
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .pipeline-box .stage-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .pipeline-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-block pre {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .code-block .comment {
+            color: var(--text-secondary);
+        }
+
+        .code-block .command {
+            color: var(--accent-green);
+        }
+
+        .code-block .output {
+            color: var(--accent-cyan);
+        }
+
+        /* Steps */
+        .steps {
+            counter-reset: step-counter;
+        }
+
+        .step {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--accent-blue);
+            position: relative;
+        }
+
+        .step::before {
+            counter-increment: step-counter;
+            content: counter(step-counter);
+            position: absolute;
+            left: -2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--accent-blue);
+            color: var(--bg-primary);
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .step h4 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .step p {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Checklist */
+        .checklist {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .check-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .check-item:last-child {
+            border-bottom: none;
+        }
+
+        .check-item .check-icon {
+            color: var(--accent-green);
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .check-item .check-content h5 {
+            margin-bottom: 0.25rem;
+        }
+
+        .check-item .check-content p {
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .card h4 {
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card h4 .card-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Table */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+        }
+
+        td {
+            color: var(--text-secondary);
+        }
+
+        /* Status badges */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-green {
+            background: rgba(63, 185, 80, 0.2);
+            color: var(--accent-green);
+        }
+
+        .badge-blue {
+            background: rgba(88, 166, 255, 0.2);
+            color: var(--accent-blue);
+        }
+
+        .badge-purple {
+            background: rgba(163, 113, 247, 0.2);
+            color: var(--accent-purple);
+        }
+
+        /* Highlight box */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1), rgba(163, 113, 247, 0.1));
+            border: 1px solid var(--accent-blue);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .highlight-box h4 {
+            color: var(--accent-blue);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header h1 {
+                font-size: 1.8rem;
+            }
+
+            .step {
+                margin-left: 1.5rem;
+            }
+
+            .step::before {
+                left: -1.5rem;
+                width: 2rem;
+                height: 2rem;
+                font-size: 0.9rem;
+            }
+
+            .pipeline {
+                flex-direction: column;
+            }
+
+            .pipeline-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Docker Neural Memory</h1>
+            <p class="subtitle">Test-Time Training Memory System Based on Google's Titans Architecture</p>
+            <div class="links">
+                <a href="https://github.com/macayaven/docker-neural-memory">GitHub Repository</a>
+                <a href="https://huggingface.co/spaces/macayaven/docker-neural-memory">HuggingFace Demo</a>
+                <a href="https://arxiv.org/abs/2501.00663">Titans Paper</a>
+            </div>
+        </header>
+
+        <!-- Project Overview -->
+        <section id="overview">
+            <h2><span class="icon">&#128202;</span> Project Overview</h2>
+            <p>
+                This project implements a containerized neural memory system that <strong>learns during inference</strong>.
+                Unlike traditional RAG systems that store and retrieve embeddings, this memory updates its neural weights
+                with every interaction, creating genuine learning from context.
+            </p>
+
+            <div class="highlight-box">
+                <h4>Key Innovation</h4>
+                <p>
+                    Traditional memory: <code>store(content) &rarr; save embedding &rarr; query(prompt) &rarr; similarity search</code><br>
+                    Neural memory: <code>observe(context) &rarr; weights update (learning) &rarr; infer(prompt) &rarr; generate from learned model</code>
+                </p>
+            </div>
+
+            <div class="card-grid">
+                <div class="card">
+                    <h4><span class="card-icon">&#129504;</span> Test-Time Training</h4>
+                    <p>Implements TTT-Linear and TTT-MLP layers that learn during inference, based on the Titans architecture.</p>
+                </div>
+                <div class="card">
+                    <h4><span class="card-icon">&#128230;</span> MCP Protocol</h4>
+                    <p>Exposes memory operations as MCP tools, compatible with Claude and other AI assistants.</p>
+                </div>
+                <div class="card">
+                    <h4><span class="card-icon">&#128190;</span> State Persistence</h4>
+                    <p>Checkpoint, restore, and fork learned memory states. Learned knowledge survives restarts.</p>
+                </div>
+                <div class="card">
+                    <h4><span class="card-icon">&#128208;</span> Observability</h4>
+                    <p>Langfuse integration for tracking experiments, learning curves, and performance metrics.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture -->
+        <section id="architecture">
+            <h2><span class="icon">&#127959;</span> System Architecture</h2>
+
+            <div class="architecture">
+                <div class="arch-flow">
+                    <div class="arch-layer">
+                        <div class="arch-box mcp">
+                            <h4>MCP Server Layer</h4>
+                            <ul>
+                                <li>&#8226; observe() - Feed context, trigger learning</li>
+                                <li>&#8226; infer() - Query learned representations</li>
+                                <li>&#8226; surprise() - Measure input novelty</li>
+                                <li>&#8226; consolidate() - Compress patterns</li>
+                                <li>&#8226; checkpoint/restore - State management</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="arch-arrow">&#8595;</div>
+
+                    <div class="arch-layer">
+                        <div class="arch-box memory">
+                            <h4>Neural Memory</h4>
+                            <ul>
+                                <li>&#8226; Embedding layer (text &rarr; vectors)</li>
+                                <li>&#8226; Surprise computation</li>
+                                <li>&#8226; Weight hash tracking</li>
+                                <li>&#8226; Gradient-based learning</li>
+                            </ul>
+                        </div>
+                        <div class="arch-box ttt">
+                            <h4>TTT Layer</h4>
+                            <ul>
+                                <li>&#8226; TTT-Linear: Fast, linear complexity</li>
+                                <li>&#8226; TTT-MLP: Expressive, 2-layer network</li>
+                                <li>&#8226; Per-token learning</li>
+                                <li>&#8226; Inner learning rate control</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="arch-arrow">&#8595;</div>
+
+                    <div class="arch-layer">
+                        <div class="arch-box state">
+                            <h4>State Management</h4>
+                            <ul>
+                                <li>&#8226; CheckpointManager - Save/restore weights</li>
+                                <li>&#8226; VersionManager - Fork/branch states</li>
+                                <li>&#8226; Learning metrics tracking</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CI/CD Pipeline -->
+        <section id="cicd">
+            <h2><span class="icon">&#9881;</span> CI/CD Pipeline</h2>
+            <p>Every push and pull request triggers the following automated pipeline:</p>
+
+            <div class="pipeline">
+                <div class="pipeline-stage">
+                    <div class="pipeline-box">
+                        <div class="stage-icon">&#128269;</div>
+                        <h4>Lint & Format</h4>
+                        <p class="stage-desc">Ruff check & format</p>
+                    </div>
+                </div>
+                <div class="pipeline-arrow">&#8594;</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-box">
+                        <div class="stage-icon">&#128203;</div>
+                        <h4>Type Check</h4>
+                        <p class="stage-desc">MyPy strict mode</p>
+                    </div>
+                </div>
+                <div class="pipeline-arrow">&#8594;</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-box">
+                        <div class="stage-icon">&#9989;</div>
+                        <h4>Test</h4>
+                        <p class="stage-desc">Pytest + coverage</p>
+                    </div>
+                </div>
+                <div class="pipeline-arrow">&#8594;</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-box">
+                        <div class="stage-icon">&#128230;</div>
+                        <h4>Build Docker</h4>
+                        <p class="stage-desc">Multi-stage build</p>
+                    </div>
+                </div>
+                <div class="pipeline-arrow">&#8594;</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-box">
+                        <div class="stage-icon">&#128640;</div>
+                        <h4>Deploy</h4>
+                        <p class="stage-desc">HuggingFace Spaces</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Stage</th>
+                            <th>Tool</th>
+                            <th>Command</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-blue">Lint</span></td>
+                            <td>Ruff</td>
+                            <td><code>ruff check src/ tests/</code></td>
+                            <td>Code quality, import sorting</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-blue">Format</span></td>
+                            <td>Ruff</td>
+                            <td><code>ruff format --check src/ tests/</code></td>
+                            <td>Consistent code style</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-purple">Type Check</span></td>
+                            <td>MyPy</td>
+                            <td><code>mypy src/</code></td>
+                            <td>Static type verification</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-green">Test</span></td>
+                            <td>Pytest</td>
+                            <td><code>pytest tests/ --cov=src</code></td>
+                            <td>Unit + integration tests</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-green">Build</span></td>
+                            <td>Docker</td>
+                            <td><code>docker build .</code></td>
+                            <td>Container image creation</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Development Workflow -->
+        <section id="workflow">
+            <h2><span class="icon">&#128736;</span> Development Workflow</h2>
+
+            <h3>Local Development Setup</h3>
+            <div class="code-block">
+                <pre><span class="comment"># Clone the repository</span>
+<span class="command">git clone https://github.com/macayaven/docker-neural-memory.git</span>
+<span class="command">cd docker-neural-memory</span>
+
+<span class="comment"># Install dependencies</span>
+<span class="command">pip install -e ".[dev]"</span>
+
+<span class="comment"># Run the MCP server locally</span>
+<span class="command">python -m src.mcp_server</span></pre>
+            </div>
+
+            <h3>Docker Development</h3>
+            <div class="code-block">
+                <pre><span class="comment"># Build and run with Docker Compose</span>
+<span class="command">docker compose build</span>
+<span class="command">docker compose up -d</span>
+
+<span class="comment"># View logs</span>
+<span class="command">docker compose logs -f</span>
+
+<span class="comment"># Stop services</span>
+<span class="command">docker compose down</span></pre>
+            </div>
+
+            <h3>Running Tests Locally</h3>
+            <div class="code-block">
+                <pre><span class="comment"># Run all tests with coverage</span>
+<span class="command">pytest tests/ -v --cov=src</span>
+
+<span class="comment"># Run specific test file</span>
+<span class="command">pytest tests/test_learning.py -v</span>
+
+<span class="comment"># Run with verbose output</span>
+<span class="command">pytest tests/ -v --tb=short</span></pre>
+            </div>
+
+            <h3>Code Quality Checks</h3>
+            <div class="code-block">
+                <pre><span class="comment"># Format code</span>
+<span class="command">ruff format src/ tests/</span>
+
+<span class="comment"># Lint and auto-fix</span>
+<span class="command">ruff check src/ tests/ --fix</span>
+
+<span class="comment"># Type checking</span>
+<span class="command">mypy src/</span></pre>
+            </div>
+        </section>
+
+        <!-- Usage Script -->
+        <section id="usage">
+            <h2><span class="icon">&#128221;</span> Step-by-Step Usage Guide</h2>
+
+            <div class="steps">
+                <div class="step">
+                    <h4>Start the Neural Memory Service</h4>
+                    <p>Launch the containerized service using Docker Compose.</p>
+                    <div class="code-block">
+                        <pre><span class="command">docker compose up -d</span>
+<span class="output">Creating network "docker-neural-memory_default"</span>
+<span class="output">Creating docker-neural-memory ... done</span></pre>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Connect via MCP Client</h4>
+                    <p>Configure your AI assistant (Claude, etc.) to connect to the MCP server.</p>
+                    <div class="code-block">
+                        <pre><span class="comment"># MCP server runs on stdio by default</span>
+<span class="comment"># Or configure the endpoint in your MCP client settings</span></pre>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Teach the Memory</h4>
+                    <p>Use the <code>observe</code> tool to feed information to the neural memory.</p>
+                    <div class="code-block">
+                        <pre><span class="comment"># Example: Teaching about Docker networking</span>
+<span class="command">observe("Docker containers can communicate via bridge networks")</span>
+<span class="output">{"surprise": 0.85, "learned": true, "weight_delta": 0.023}</span>
+
+<span class="command">observe("Docker containers can communicate via bridge networks")</span>
+<span class="output">{"surprise": 0.42, "learned": true, "weight_delta": 0.008}</span>
+<span class="comment"># Note: Surprise decreases on repeated patterns - it's learning!</span></pre>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Query the Memory</h4>
+                    <p>Use <code>infer</code> to generate responses from learned knowledge.</p>
+                    <div class="code-block">
+                        <pre><span class="command">infer("How do containers communicate?")</span>
+<span class="output">{"response": "Containers communicate via bridge networks...", "confidence": 0.78}</span></pre>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Check Learning Progress</h4>
+                    <p>Use <code>surprise</code> to measure how familiar content is.</p>
+                    <div class="code-block">
+                        <pre><span class="command">surprise("Docker bridge networking")</span>
+<span class="output">{"surprise": 0.35}  // Low = familiar</span>
+
+<span class="command">surprise("Kubernetes pod autoscaling")</span>
+<span class="output">{"surprise": 0.91}  // High = novel/unknown</span></pre>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Save Learned State</h4>
+                    <p>Checkpoint the memory to preserve learned knowledge.</p>
+                    <div class="code-block">
+                        <pre><span class="command">checkpoint("docker-expert-v1", "Trained on Docker networking docs")</span>
+<span class="output">{"tag": "docker-expert-v1", "size_mb": 2.4, "timestamp": "2024-01-08T12:00:00Z"}</span></pre>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Fork for Experiments</h4>
+                    <p>Create branches of memory state to try different learning paths.</p>
+                    <div class="code-block">
+                        <pre><span class="command">fork("docker-expert-v1", "kubernetes-experiment")</span>
+<span class="output">{"forked": true, "source_tag": "docker-expert-v1", "new_tag": "kubernetes-experiment"}</span>
+
+<span class="comment"># Now teach Kubernetes to the fork without affecting the original</span>
+<span class="command">observe("Pods are the smallest deployable units in Kubernetes")</span></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Verification -->
+        <section id="verification">
+            <h2><span class="icon">&#9989;</span> Verification Checklist</h2>
+            <p>Use this checklist to verify the system is working correctly before demo or submission:</p>
+
+            <div class="checklist">
+                <div class="check-item">
+                    <span class="check-icon">&#10003;</span>
+                    <div class="check-content">
+                        <h5>Learning Verification</h5>
+                        <p>Observe the same pattern 5+ times. Surprise should decrease from ~0.8 to &lt;0.3, demonstrating learning.</p>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span class="check-icon">&#10003;</span>
+                    <div class="check-content">
+                        <h5>Novelty Detection</h5>
+                        <p>After training on topic A, test surprise on topic B. Should remain high (~0.8+), showing discrimination.</p>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span class="check-icon">&#10003;</span>
+                    <div class="check-content">
+                        <h5>State Persistence</h5>
+                        <p>Checkpoint, restart container, restore. Surprise on trained patterns should match pre-restart values.</p>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span class="check-icon">&#10003;</span>
+                    <div class="check-content">
+                        <h5>Fork Independence</h5>
+                        <p>Fork state, train fork on new content. Original checkpoint should not reflect new learning.</p>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span class="check-icon">&#10003;</span>
+                    <div class="check-content">
+                        <h5>CI Pipeline Green</h5>
+                        <p>All GitHub Actions checks pass: Lint, Type Check, Test, Docker Build.</p>
+                    </div>
+                </div>
+
+                <div class="check-item">
+                    <span class="check-icon">&#10003;</span>
+                    <div class="check-content">
+                        <h5>HuggingFace Deployment</h5>
+                        <p>Live demo accessible at HuggingFace Spaces URL, responding to requests.</p>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Quick Verification Script</h3>
+            <div class="code-block">
+                <pre><span class="comment"># Run this sequence to verify core functionality</span>
+
+<span class="comment"># 1. Start fresh</span>
+<span class="command">docker compose down -v && docker compose up -d</span>
+
+<span class="comment"># 2. Run the test suite</span>
+<span class="command">pytest tests/ -v</span>
+
+<span class="comment"># Expected: All tests pass</span>
+<span class="output">===================== 12 passed in 8.43s =====================</span>
+
+<span class="comment"># 3. Test learning behavior (via Python)</span>
+<span class="command">python -c "</span>
+from src.memory.neural_memory import NeuralMemory
+m = NeuralMemory(dim=64)
+pattern = 'Docker uses containers for isolation'
+
+# Initial surprise should be high
+s1 = m.observe(pattern)['surprise']
+print(f'Initial surprise: {s1:.3f}')
+
+# After learning, surprise should decrease
+for _ in range(10):
+    m.observe(pattern)
+s2 = m.observe(pattern)['surprise']
+print(f'After learning: {s2:.3f}')
+
+# Verify learning occurred
+assert s2 < s1 * 0.5, 'Learning failed!'
+print('Learning verification: PASSED')
+<span class="command">"</span></pre>
+            </div>
+        </section>
+
+        <!-- Experiment Framework -->
+        <section id="experiments">
+            <h2><span class="icon">&#128300;</span> Experiment Framework</h2>
+            <p>The project includes a comprehensive experiment framework for validating memory behavior:</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <h4><span class="card-icon">&#128218;</span> Learning Suite</h4>
+                    <p>Tests surprise decrease over repeated observations, validates learning curves and convergence.</p>
+                    <code>python run_experiments.py --suite learning</code>
+                </div>
+                <div class="card">
+                    <h4><span class="card-icon">&#128200;</span> Retention Suite</h4>
+                    <p>Verifies knowledge persistence over time and after consolidation operations.</p>
+                    <code>python run_experiments.py --suite retention</code>
+                </div>
+                <div class="card">
+                    <h4><span class="card-icon">&#127793;</span> Generalization Suite</h4>
+                    <p>Tests transfer learning, cross-domain knowledge, and novel input handling.</p>
+                    <code>python run_experiments.py --suite generalization</code>
+                </div>
+                <div class="card">
+                    <h4><span class="card-icon">&#128202;</span> Capacity Suite</h4>
+                    <p>Stress tests memory limits, scaling behavior, and saturation detection.</p>
+                    <code>python run_experiments.py --suite capacity</code>
+                </div>
+            </div>
+
+            <h3>Running Experiments with Langfuse Tracking</h3>
+            <div class="code-block">
+                <pre><span class="comment"># Set Langfuse credentials</span>
+<span class="command">export LANGFUSE_PUBLIC_KEY="pk-..."</span>
+<span class="command">export LANGFUSE_SECRET_KEY="sk-..."</span>
+
+<span class="comment"># Run all experiments with tracking</span>
+<span class="command">cd experiments/scripts</span>
+<span class="command">python run_experiments.py --suite all --dim 256 --lr 0.01</span>
+
+<span class="comment"># Results are logged to Langfuse dashboard</span>
+<span class="output">Langfuse connected: tracking to exp_all_20240108_120000</span>
+<span class="output">Running learning suite...</span>
+<span class="output">  [PASS] surprise_decrease (234.5ms)</span>
+<span class="output">  [PASS] weight_updates (156.2ms)</span>
+<span class="output">...</span></pre>
+            </div>
+        </section>
+
+        <!-- Key Metrics -->
+        <section id="metrics">
+            <h2><span class="icon">&#128200;</span> Key Metrics to Highlight</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Expected Value</th>
+                            <th>Significance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Surprise Reduction</td>
+                            <td>&gt;50% after 10 observations</td>
+                            <td>Demonstrates genuine learning</td>
+                        </tr>
+                        <tr>
+                            <td>Cross-Domain Discrimination</td>
+                            <td>&gt;0.7 surprise on unrelated topics</td>
+                            <td>Not just memorizing everything</td>
+                        </tr>
+                        <tr>
+                            <td>Checkpoint Restore Accuracy</td>
+                            <td>&lt;1% surprise deviation</td>
+                            <td>State persistence works correctly</td>
+                        </tr>
+                        <tr>
+                            <td>Inference Latency (p99)</td>
+                            <td>&lt;100ms</td>
+                            <td>Production-ready performance</td>
+                        </tr>
+                        <tr>
+                            <td>Memory Size</td>
+                            <td>~2-5 MB per checkpoint</td>
+                            <td>Efficient storage footprint</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Demo Script -->
+        <section id="demo">
+            <h2><span class="icon">&#127916;</span> Demo Script for Job Application</h2>
+
+            <div class="highlight-box">
+                <h4>Talking Points</h4>
+                <p>
+                    "This project demonstrates my ability to implement cutting-edge ML research (Titans/TTT architecture from Google),
+                    containerize complex systems, build production-grade CI/CD pipelines, and create developer-friendly tooling via MCP protocol."
+                </p>
+            </div>
+
+            <h3>3-Minute Demo Flow</h3>
+            <div class="steps">
+                <div class="step">
+                    <h4>Show the Problem (30s)</h4>
+                    <p>"Traditional RAG stores embeddings but doesn't truly learn. Show a RAG system returning the same similarity scores regardless of how many times you query."</p>
+                </div>
+                <div class="step">
+                    <h4>Demonstrate Learning (60s)</h4>
+                    <p>"Watch the surprise metric decrease as I teach the same concept repeatedly. This is actual weight updates happening during inference."</p>
+                </div>
+                <div class="step">
+                    <h4>Show State Management (45s)</h4>
+                    <p>"I can checkpoint this learned state, fork it for experiments, and restore it after container restart. The knowledge persists."</p>
+                </div>
+                <div class="step">
+                    <h4>Highlight Engineering (45s)</h4>
+                    <p>"Full CI/CD pipeline, Docker containerization, MCP integration for AI assistants, Langfuse observability. Production-ready code."</p>
+                </div>
+            </div>
+
+            <h3>Key Technical Achievements to Mention</h3>
+            <ul style="list-style: none; padding: 1rem;">
+                <li style="padding: 0.5rem 0; color: var(--text-secondary);">&#10003; Implemented test-time training from recent research papers</li>
+                <li style="padding: 0.5rem 0; color: var(--text-secondary);">&#10003; Built MCP server compatible with Claude and other AI assistants</li>
+                <li style="padding: 0.5rem 0; color: var(--text-secondary);">&#10003; Full type safety with MyPy strict mode</li>
+                <li style="padding: 0.5rem 0; color: var(--text-secondary);">&#10003; Comprehensive test suite with learning verification</li>
+                <li style="padding: 0.5rem 0; color: var(--text-secondary);">&#10003; Automated deployment to HuggingFace Spaces</li>
+                <li style="padding: 0.5rem 0; color: var(--text-secondary);">&#10003; Observability integration with Langfuse</li>
+            </ul>
+        </section>
+
+        <footer>
+            <p>
+                Docker Neural Memory &mdash; Built by <a href="https://github.com/macayaven">macayaven</a>
+                <br>
+                <small>Based on <a href="https://arxiv.org/abs/2501.00663">Titans</a> and <a href="https://arxiv.org/abs/2407.04620">TTT</a> research</small>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

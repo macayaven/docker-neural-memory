@@ -6,7 +6,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install dependencies
-RUN pip install --no-cache-dir torch transformers mcp pydantic uvicorn
+RUN pip install --no-cache-dir torch pydantic pydantic-settings uvicorn fastapi mcp
 
 # Copy source code
 COPY src/ /app/src/
@@ -22,12 +22,14 @@ VOLUME ["/app/weights", "/app/checkpoints"]
 ENV MEMORY_DIM=512
 ENV TTT_VARIANT=mlp
 ENV LEARNING_RATE=0.01
+ENV SERVER_MODE=http
 
-# MCP server port
+# Server port
 EXPOSE 8765
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', 8765)); s.close()" || exit 1
+    CMD curl -f http://localhost:8765/health || exit 1
 
-CMD ["python", "-m", "src.mcp_server"]
+# Default: HTTP server (use "python -m src.mcp_server" for MCP mode)
+CMD ["python", "-m", "src.http_server"]
