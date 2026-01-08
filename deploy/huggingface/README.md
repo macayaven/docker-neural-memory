@@ -4,7 +4,7 @@ emoji: 🧠
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: 4.0.0
+sdk_version: 5.9.1
 app_file: app.py
 pinned: false
 license: mit
@@ -12,34 +12,38 @@ license: mit
 
 # Docker Neural Memory
 
-**Memory that LEARNS, not just stores**
+**Real Test-Time Training - Not a Simulation**
 
-This demo showcases containerized neural memory using Google's Titans architecture (Dec 2024). Unlike RAG/vector databases that just store and retrieve embeddings, this system's **weights actually update during inference**.
+This demo runs **actual PyTorch** code implementing Google's Titans architecture. When you observe content, real gradients flow and real neural network weights update.
+
+## What Makes This Real
+
+- **Real Neural Network**: 2-layer MLP with ~250K parameters
+- **Real Gradient Descent**: `torch.autograd.grad()` computes gradients
+- **Real Weight Updates**: Parameters physically change during inference
+- **Real Surprise Metric**: MSE loss measures prediction error
+
+## Docker-Native Design
+
+This project demonstrates production-grade AI infrastructure:
+
+- **MCP Server**: Model Context Protocol for Claude Desktop integration
+- **Docker Volumes**: Persist learned state across container restarts
+- **CI/CD Pipeline**: GitHub Actions with Docker build and deploy
+- **Kubernetes Ready**: Designed for orchestrated deployment
 
 ## Key Features
 
-- **Real Learning**: Weights change on every `observe()` call
-- **Pattern Recognition**: Surprise decreases as patterns are learned
-- **Bounded Capacity**: Fixed parameter count (doesn't grow like vector DBs)
-- **Docker-Native**: Designed for containerized deployment with persistent volumes
-
-## How It Works
-
-```
-Traditional Memory:  Input → Embed → Store → Retrieve (static)
-Neural Memory:       Input → Learn → Update Weights → Infer (dynamic)
-```
-
-## Demo Tabs
-
-1. **Chat with Advocate**: Ask about the project and the developer
-2. **Live Demo**: Watch weights change and surprise decrease
-3. **Interactive**: Try observing your own content
-4. **About Carlos**: Meet the developer
+| Feature | Implementation |
+|---------|---------------|
+| Test-Time Training | PyTorch autograd during inference |
+| State Persistence | Docker volumes for checkpoints |
+| MCP Integration | Tools: observe, surprise, checkpoint, restore |
+| Bounded Memory | Fixed parameters (doesn't grow like vector DBs) |
 
 ## Built By
 
-**Carlos Crespo Macaya** - AI Engineer specializing in GenAI Systems & Applied MLOps
+**Carlos Crespo Macaya** - AI Engineer
 
 - 10+ years production ML experience
 - Expert in Docker, Kubernetes, MCP servers
@@ -50,5 +54,4 @@ Contact: macayaven@gmail.com
 ## Links
 
 - [GitHub Repository](https://github.com/macayaven/docker-neural-memory)
-- [Technical Specification](https://github.com/macayaven/docker-neural-memory/blob/main/SPEC.md)
 - [Titans Paper](https://arxiv.org/abs/2501.00663)

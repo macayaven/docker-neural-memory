@@ -1,8 +1,8 @@
 """
-Docker Neural Memory - Interactive Learning Demo
+Docker Neural Memory - Production Demo
 
-Step-by-step guided demo showing how Neural Memory (Titans) differs from RAG.
-Transparent visualization of: Surprise, Momentum, Forgetting, Learning.
+REAL neural memory implementation using Titans architecture.
+Demonstrates Docker-native AI memory with MCP server integration.
 
 Deploy to: https://huggingface.co/spaces
 """
@@ -14,648 +14,321 @@ import gradio as gr
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 matplotlib.use("Agg")
 
-# Add src to path
+# Add src to path for real implementation
+sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-try:
-    from src.config import MemoryConfig  # noqa: F401
-    from src.memory.neural_memory import NeuralMemory  # noqa: F401
+from src.config import MemoryConfig
+from src.memory.neural_memory import NeuralMemory
 
-    MEMORY_AVAILABLE = True
-except ImportError:
-    MEMORY_AVAILABLE = False
+# =============================================================================
+# REAL NEURAL MEMORY INSTANCE
+# =============================================================================
 
+# Initialize the REAL neural memory - this is actual PyTorch, not a simulation
+memory = NeuralMemory(MemoryConfig(dim=256, learning_rate=0.02))
 
-class NeuralMemoryDemo:
-    """Neural Memory with full transparency for demo."""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self._weights = np.random.randn(16, 16) * 0.1
-        self._initial_weights = self._weights.copy()
-        self._surprise_history = []
-        self._momentum = 0.0
-        self._momentum_history = []
-        self._content_history = []
-        self._weight_history = [self._weights.copy()]
-        self._forgetting_applied = []
-        self._observation_count = 0
-
-    def observe(self, text: str) -> dict:
-        """Observe content with full transparency."""
-        self._observation_count += 1
-
-        # Calculate surprise (gradient-based novelty)
-        text_hash = sum(ord(c) for c in text) % 1000
-        base_surprise = 0.9
-
-        # Check similarity to previous content
-        for prev_content in self._content_history:
-            similarity = self._text_similarity(text, prev_content)
-            base_surprise -= similarity * 0.3
-
-        surprise = max(0.05, min(0.95, base_surprise))
-
-        # Update momentum (exponential moving average of surprise)
-        momentum_decay = 0.7
-        self._momentum = momentum_decay * self._momentum + (1 - momentum_decay) * surprise
-
-        # Adaptive forgetting (weight decay based on capacity)
-        forgetting_rate = 0.02 * (1 + len(self._content_history) / 10)
-        self._weights *= (1 - forgetting_rate)
-        forgot_amount = forgetting_rate * np.abs(self._weights).mean()
-
-        # Learning: update weights based on surprise
-        if surprise > 0.3:  # Only learn if surprising enough
-            learning_rate = 0.05 * surprise
-            delta = np.random.randn(16, 16) * learning_rate
-            # Direction influenced by content
-            np.random.seed(text_hash)
-            direction = np.random.randn(16, 16)
-            delta = delta * np.sign(direction)
-            self._weights += delta
-            learned = True
-        else:
-            delta = np.zeros((16, 16))
-            learned = False
-
-        # Record history
-        self._surprise_history.append(surprise)
-        self._momentum_history.append(self._momentum)
-        self._content_history.append(text)
-        self._weight_history.append(self._weights.copy())
-        self._forgetting_applied.append(forgot_amount)
-
-        return {
-            "surprise": surprise,
-            "momentum": self._momentum,
-            "learned": learned,
-            "forgot": forgot_amount,
-            "weight_delta": np.abs(delta).mean(),
-            "total_observations": self._observation_count,
-        }
-
-    def _text_similarity(self, text1: str, text2: str) -> float:
-        """Simple word overlap similarity."""
-        words1 = set(text1.lower().split())
-        words2 = set(text2.lower().split())
-        if not words1 or not words2:
-            return 0.0
-        overlap = len(words1 & words2)
-        return overlap / max(len(words1), len(words2))
-
-    def get_weights(self) -> np.ndarray:
-        return self._weights.copy()
-
-    def get_weight_change(self) -> np.ndarray:
-        """Get total weight change from initial."""
-        return self._weights - self._initial_weights
+# Track history for visualization
+observation_history: list[dict] = []
 
 
-class MockRAG:
-    """RAG simulation - stores, doesn't learn."""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.vectors = []
-        self.storage_size = 0
-
-    def store(self, text: str) -> dict:
-        """Store text (no learning, just accumulation)."""
-        self.vectors.append(text)
-        self.storage_size += len(text.encode())
-        return {
-            "similarity": 0.73,  # Always same for same query
-            "vector_count": len(self.vectors),
-            "storage_bytes": self.storage_size,
-        }
-
-
-# Global instances
-neural = NeuralMemoryDemo()
-rag = MockRAG()
-
-
-def reset_all():
-    """Reset both systems."""
-    neural.reset()
-    rag.reset()
-    return "Both systems reset. Ready to learn!"
+def reset_memory():
+    """Reset to fresh memory state."""
+    global memory, observation_history
+    memory = NeuralMemory(MemoryConfig(dim=256, learning_rate=0.02))
+    observation_history = []
+    return "Memory reset. Fresh neural network initialized."
 
 
 # =============================================================================
-# VISUALIZATION FUNCTIONS
+# VISUALIZATION
 # =============================================================================
 
 
-def create_weight_heatmap(weights: np.ndarray, title: str = "Neural Weights") -> plt.Figure:
-    """Create a heatmap of weights."""
-    fig, ax = plt.subplots(figsize=(5, 4))
+def get_weight_sample() -> np.ndarray:
+    """Extract 16x16 sample of actual neural weights."""
+    with torch.no_grad():
+        # Get weights from first linear layer
+        weights = memory.memory_net[0].weight.data[:16, :16]
+        return weights.cpu().numpy()
+
+
+def create_weight_visualization() -> plt.Figure:
+    """Visualize actual neural network weights."""
+    weights = get_weight_sample()
+
+    fig, ax = plt.subplots(figsize=(6, 5))
     im = ax.imshow(weights, cmap="RdBu_r", aspect="auto", vmin=-0.5, vmax=0.5)
-    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.set_title(
+        f"Neural Memory Weights\n({sum(p.numel() for p in memory.memory_net.parameters()):,} parameters)",
+        fontsize=12,
+        fontweight="bold",
+    )
+    ax.set_xlabel("These weights UPDATE during inference (TTT)")
     ax.axis("off")
     plt.colorbar(im, ax=ax, label="Weight Value")
     plt.tight_layout()
     return fig
 
 
-def create_surprise_gauge(surprise: float, momentum: float) -> plt.Figure:
-    """Create surprise and momentum gauges."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 3))
-
-    # Surprise gauge
-    colors = ["#27ae60", "#f39c12", "#e74c3c"]
-    surprise_color = colors[0] if surprise < 0.3 else (colors[1] if surprise < 0.6 else colors[2])
-
-    theta = np.linspace(np.pi, 0, 100)
-    ax1.plot(np.cos(theta), np.sin(theta), "k-", linewidth=2)
-    ax1.fill_between(np.cos(theta), 0, np.sin(theta), alpha=0.1, color="gray")
-
-    angle = np.pi * (1 - surprise)
-    ax1.arrow(0, 0, 0.65 * np.cos(angle), 0.65 * np.sin(angle),
-              head_width=0.08, head_length=0.04, fc=surprise_color, ec=surprise_color)
-    ax1.plot(0, 0, "ko", markersize=8)
-    ax1.text(-0.9, -0.15, "Familiar", ha="center", fontsize=9)
-    ax1.text(0.9, -0.15, "Novel", ha="center", fontsize=9)
-    ax1.text(0, 0.45, f"{surprise:.2f}", ha="center", fontsize=20, fontweight="bold", color=surprise_color)
-    ax1.set_title("SURPRISE\n(How novel is this?)", fontsize=11, fontweight="bold")
-    ax1.set_xlim(-1.2, 1.2)
-    ax1.set_ylim(-0.3, 1.1)
-    ax1.axis("off")
-
-    # Momentum gauge
-    momentum_color = colors[0] if momentum < 0.3 else (colors[1] if momentum < 0.6 else colors[2])
-
-    ax2.plot(np.cos(theta), np.sin(theta), "k-", linewidth=2)
-    ax2.fill_between(np.cos(theta), 0, np.sin(theta), alpha=0.1, color="gray")
-
-    angle = np.pi * (1 - momentum)
-    ax2.arrow(0, 0, 0.65 * np.cos(angle), 0.65 * np.sin(angle),
-              head_width=0.08, head_length=0.04, fc=momentum_color, ec=momentum_color)
-    ax2.plot(0, 0, "ko", markersize=8)
-    ax2.text(-0.9, -0.15, "Stable", ha="center", fontsize=9)
-    ax2.text(0.9, -0.15, "Active", ha="center", fontsize=9)
-    ax2.text(0, 0.45, f"{momentum:.2f}", ha="center", fontsize=20, fontweight="bold", color=momentum_color)
-    ax2.set_title("MOMENTUM\n(Recent activity level)", fontsize=11, fontweight="bold")
-    ax2.set_xlim(-1.2, 1.2)
-    ax2.set_ylim(-0.3, 1.1)
-    ax2.axis("off")
-
-    plt.tight_layout()
-    return fig
-
-
 def create_history_plot() -> plt.Figure:
-    """Create history of surprise and momentum."""
+    """Plot surprise history."""
     fig, ax = plt.subplots(figsize=(8, 3))
 
-    if neural._surprise_history:
-        x = range(1, len(neural._surprise_history) + 1)
-        ax.plot(x, neural._surprise_history, "o-", label="Surprise", color="#e74c3c", linewidth=2, markersize=8)
-        ax.plot(x, neural._momentum_history, "s--", label="Momentum", color="#3498db", linewidth=2, markersize=6)
-        ax.axhline(y=0.3, color="gray", linestyle=":", alpha=0.5, label="Learning threshold")
-        ax.set_xlabel("Observation #", fontsize=10)
-        ax.set_ylabel("Score", fontsize=10)
-        ax.legend(loc="upper right")
+    if observation_history:
+        surprises = [h["surprise"] for h in observation_history]
+        x = range(1, len(surprises) + 1)
+        ax.plot(x, surprises, "o-", color="#e74c3c", linewidth=2, markersize=8)
+        ax.axhline(y=0.5, color="gray", linestyle="--", alpha=0.5, label="Threshold")
+        ax.set_xlabel("Observation #")
+        ax.set_ylabel("Surprise")
         ax.set_ylim(0, 1)
         ax.grid(True, alpha=0.3)
+        ax.legend()
     else:
         ax.text(0.5, 0.5, "No observations yet", ha="center", va="center", fontsize=12, color="gray")
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
 
-    ax.set_title("Learning History", fontsize=12, fontweight="bold")
-    plt.tight_layout()
-    return fig
-
-
-def create_comparison_chart() -> plt.Figure:
-    """Create side-by-side comparison."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-
-    # Neural Memory - Weight change visualization
-    if len(neural._weight_history) > 1:
-        change = neural.get_weight_change()
-        im = ax1.imshow(change, cmap="RdBu_r", aspect="auto", vmin=-0.3, vmax=0.3)
-        plt.colorbar(im, ax=ax1, label="Change from initial")
-    else:
-        ax1.text(0.5, 0.5, "No changes yet", ha="center", va="center", transform=ax1.transAxes)
-
-    ax1.set_title(f"Neural Memory\n{neural._observation_count} observations, FIXED size", fontsize=11, fontweight="bold", color="#2980b9")
-    ax1.axis("off")
-
-    # RAG - Vector accumulation
-    if rag.vectors:
-        y_pos = np.arange(min(len(rag.vectors), 10))
-        ax2.barh(y_pos, [len(v) for v in rag.vectors[-10:]], color="#95a5a6")
-        ax2.set_yticks(y_pos)
-        ax2.set_yticklabels([f"Vec {i+1}" for i in range(len(y_pos))])
-        ax2.set_xlabel("Characters stored")
-    else:
-        ax2.text(0.5, 0.5, "No vectors stored", ha="center", va="center", transform=ax2.transAxes)
-
-    ax2.set_title(f"RAG\n{len(rag.vectors)} vectors, {rag.storage_size} bytes (GROWING)", fontsize=11, fontweight="bold", color="#7f8c8d")
-
+    ax.set_title("Learning Progress (Surprise Over Time)", fontsize=12, fontweight="bold")
     plt.tight_layout()
     return fig
 
 
 # =============================================================================
-# GUIDED TOUR STEPS
+# CORE MEMORY OPERATIONS
 # =============================================================================
 
-TOUR_STEPS = [
-    {
-        "title": "Welcome: Two Types of Memory",
-        "content": """## The Student Analogy
 
-Imagine two students taking an exam:
+def observe_content(content: str) -> tuple[str, plt.Figure, plt.Figure]:
+    """
+    Feed content to REAL neural memory - triggers actual gradient updates.
+    """
+    if not content.strip():
+        return "Please enter content to observe.", None, None
 
-**RAG (Retrieval)** = Student with a textbook
-- Has all the information available
-- Must look up each answer in the index
-- Slower, depends on finding exact matches
-- Book keeps growing with every new topic
+    # Get weight hash BEFORE
+    hash_before = memory.get_weight_hash()
 
-**Neural Memory (Titans)** = Student with photographic memory
-- Studies material just before (and during!) the exam
-- Synthesizes and integrates concepts
-- Responds fluidly without external lookup
-- Fixed brain capacity, but keeps learning
+    # REAL observation with actual gradient descent
+    result = memory.observe(content)
 
-**Click "Next Step" to see this in action!**
-""",
-        "action": None,
-    },
-    {
-        "title": "Step 1: First Observation",
-        "content": """## Teaching Something New
+    # Get weight hash AFTER
+    hash_after = memory.get_weight_hash()
 
-Let's teach both systems: **"Docker containers provide process isolation"**
-
-Watch what happens:
-- **Neural Memory**: Calculates SURPRISE (is this new?)
-- **RAG**: Just stores the vector (no thinking)
-
-**Click "Run This Step" to observe!**
-""",
-        "action": "Docker containers provide process isolation",
-    },
-    {
-        "title": "Step 2: Repetition = Learning",
-        "content": """## Same Content Again
-
-Now we'll teach the SAME thing: **"Docker containers provide process isolation"**
-
-**Key insight**:
-- Neural Memory's SURPRISE will DROP (it recognizes this!)
-- RAG will just add another vector (no recognition)
-
-This is the fundamental difference: **learning vs storing**.
-
-**Click "Run This Step" to see surprise decrease!**
-""",
-        "action": "Docker containers provide process isolation",
-    },
-    {
-        "title": "Step 3: The Power of Momentum",
-        "content": """## Momentum: Memory of Surprise
-
-MOMENTUM tracks surprise over time - it's like short-term memory of activity.
-
-Teaching again: **"Docker containers provide process isolation"**
-
-Watch:
-- Surprise: Very low now (familiar content)
-- Momentum: Decreasing (less overall activity)
-
-**Momentum helps capture the "flow" of events in a sequence.**
-
-**Click "Run This Step"!**
-""",
-        "action": "Docker containers provide process isolation",
-    },
-    {
-        "title": "Step 4: Generalization",
-        "content": """## Can It Generalize?
-
-Now the real test - a PARAPHRASE: **"Containers isolate processes in Docker"**
-
-Same meaning, different words!
-
-- **Neural Memory**: Should recognize similarity (moderate surprise)
-- **RAG**: Treats it as completely new (just stores another vector)
-
-**This is why Titans beats RAG with 70x fewer parameters!**
-
-**Click "Run This Step"!**
-""",
-        "action": "Containers isolate processes in Docker",
-    },
-    {
-        "title": "Step 5: Adaptive Forgetting",
-        "content": """## The Forgetting Mechanism
-
-Neural Memory doesn't just learn - it also FORGETS!
-
-Teaching something new: **"Kubernetes orchestrates container deployments"**
-
-Watch the "Forgot" metric - old, less relevant information decays.
-
-**Why forgetting matters:**
-- Prevents memory overflow
-- Keeps capacity bounded
-- Prioritizes recent/relevant info
-- Scales to 2M+ token windows!
-
-**Click "Run This Step"!**
-""",
-        "action": "Kubernetes orchestrates container deployments",
-    },
-    {
-        "title": "Step 6: What This Enables",
-        "content": """## Capabilities Unlocked by Neural Memory
-
-These mechanisms enable powerful new functionalities:
-
-### 1. Extreme Long Context (2M+ tokens)
-Process entire codebases, books, or document collections in a single pass.
-RAG struggles with context fragmentation; Neural Memory synthesizes continuously.
-
-### 2. Test-Time Adaptation
-The model keeps learning DURING inference. Feed it your coding style,
-your domain terminology, your preferences - it adapts on the fly.
-
-### 3. No Re-indexing Required
-Traditional RAG needs to re-embed documents when they change.
-Neural Memory learns incrementally - just observe the new content.
-
-### 4. Privacy-Friendly Bounded Memory
-Fixed capacity means you control exactly how much is remembered.
-Old information naturally decays - no accumulating sensitive data forever.
-
-### 5. Semantic Compression
-Instead of storing raw text, Neural Memory distills PATTERNS.
-This is why it achieves 98% accuracy with 70x fewer parameters than RAG.
-
-**Click "Next Step" to understand the trade-offs...**
-""",
-        "action": None,
-    },
-    {
-        "title": "Step 7: Honest Drawbacks",
-        "content": """## When RAG Might Be Better
-
-No technology is perfect. Here's when Neural Memory has limitations:
-
-### Drawbacks of Neural Memory:
-
-**1. Forgetting Can Lose Important Info**
-The adaptive forgetting mechanism might decay critical facts if not reinforced.
-RAG's explicit storage guarantees nothing is lost.
-
-**2. Less Interpretable**
-RAG can show you exactly which documents it retrieved.
-Neural Memory's knowledge is encoded in weights - harder to audit.
-
-**3. No Exact Retrieval**
-Need to quote a specific passage verbatim? RAG excels here.
-Neural Memory synthesizes - it may paraphrase or miss exact wording.
-
-**4. Compute Overhead**
-Online learning during inference adds computational cost.
-RAG's vector lookup is simpler and faster for basic retrieval.
-
-**5. Newer, Less Battle-Tested**
-RAG has years of production deployment experience.
-Neural Memory (Titans) is cutting-edge research (Dec 2024).
-
-### The Right Choice Depends on Your Use Case:
-- **Use RAG** for: Exact quotes, audit trails, simple Q&A, proven stability
-- **Use Neural Memory** for: Long context, adaptation, compression, learning
-
-**Click "Next Step" for the summary!**
-""",
-        "action": None,
-    },
-    {
-        "title": "Summary: Making the Right Choice",
-        "content": """## What You've Learned
-
-### The Core Mechanisms
-
-| Feature | Neural Memory | RAG |
-|---------|--------------|-----|
-| **Surprise** | Measures novelty via gradients | N/A |
-| **Momentum** | Tracks activity over time | N/A |
-| **Forgetting** | Adaptive weight decay | Never forgets |
-| **Learning** | Continuous, during inference | None |
-
-### When to Use Each
-
-| Use Case | Best Choice | Why |
-|----------|-------------|-----|
-| Long documents (2M+ tokens) | Neural Memory | Handles extreme context |
-| Exact quote retrieval | RAG | Explicit storage |
-| Adapting to user style | Neural Memory | Test-time learning |
-| Audit/compliance needs | RAG | Interpretable retrieval |
-| Resource-constrained | Neural Memory | 70x fewer parameters |
-| Production stability | RAG | Battle-tested |
-
-### The Key Insight
-
-Neural Memory **LEARNS and FORGETS** like a brain.
-RAG **STORES and RETRIEVES** like a filing cabinet.
-
-Neither is universally better - choose based on your needs.
-
-**Try the Playground tab to experiment yourself!**
-""",
-        "action": None,
-    },
-]
-
-current_step = {"index": 0}
-
-
-def get_current_step():
-    """Get current tour step content."""
-    step = TOUR_STEPS[current_step["index"]]
-    return step["title"], step["content"]
-
-
-def run_step():
-    """Execute the current step's action."""
-    step = TOUR_STEPS[current_step["index"]]
-
-    if step["action"] is None:
-        return (
-            "No action for this step - it's informational.",
-            None, None, None, None
-        )
-
-    content = step["action"]
-
-    # Run on both systems
-    neural_result = neural.observe(content)
-    rag_result = rag.store(content)
-
-    # Create visualizations
-    gauge_fig = create_surprise_gauge(neural_result["surprise"], neural_result["momentum"])
-    weights_fig = create_weight_heatmap(neural.get_weights(), "Current Neural Weights")
-    history_fig = create_history_plot()
-    comparison_fig = create_comparison_chart()
+    # Record history
+    observation_history.append({
+        "content": content[:50],
+        "surprise": result["surprise"],
+        "weight_delta": result["weight_delta"],
+        "learned": result["learned"],
+    })
 
     # Format result
-    learned_text = "YES - weights updated!" if neural_result["learned"] else "NO - too familiar"
-    result_text = f"""### Results for: "{content}"
+    weights_changed = hash_before != hash_after
+    output = f"""## Observation Result
 
-**Neural Memory:**
-- Surprise: {neural_result['surprise']:.3f} ({"Novel!" if neural_result['surprise'] > 0.6 else "Familiar" if neural_result['surprise'] < 0.3 else "Moderate"})
-- Momentum: {neural_result['momentum']:.3f}
-- Learned: {learned_text}
-- Forgot: {neural_result['forgot']:.4f} (weight decay applied)
+**Content:** "{content[:100]}{'...' if len(content) > 100 else ''}"
 
-**RAG:**
-- Similarity: {rag_result['similarity']:.2f} (always the same!)
-- Vectors stored: {rag_result['vector_count']}
-- Storage: {rag_result['storage_bytes']} bytes (growing!)
+### Metrics (REAL - from PyTorch gradient descent)
+
+| Metric | Value |
+|--------|-------|
+| **Surprise** | {result['surprise']:.4f} |
+| **Weight Delta** | {result['weight_delta']:.6f} |
+| **Weights Changed** | {'YES' if weights_changed else 'NO'} |
+| **Hash Before** | `{hash_before}` |
+| **Hash After** | `{hash_after}` |
+
+### What Just Happened
+
+1. Text was encoded to tensor representation
+2. Forward pass through neural memory network
+3. **Surprise computed** via prediction error (MSE loss)
+4. **Gradients calculated** via `torch.autograd.grad()`
+5. **Weights updated** via gradient descent: `param -= lr * grad`
+
+This is REAL test-time training. The neural network's weights physically changed.
 """
 
-    return result_text, gauge_fig, weights_fig, history_fig, comparison_fig
+    return output, create_weight_visualization(), create_history_plot()
 
 
-def next_step():
-    """Go to next step."""
-    if current_step["index"] < len(TOUR_STEPS) - 1:
-        current_step["index"] += 1
-    return get_current_step()
-
-
-def prev_step():
-    """Go to previous step."""
-    if current_step["index"] > 0:
-        current_step["index"] -= 1
-    return get_current_step()
-
-
-def reset_tour():
-    """Reset tour to beginning."""
-    current_step["index"] = 0
-    reset_all()
-    return get_current_step()
-
-
-# =============================================================================
-# PLAYGROUND FUNCTIONS
-# =============================================================================
-
-
-def playground_observe(content: str):
-    """Observe content in playground mode."""
+def check_surprise(content: str) -> str:
+    """Check surprise WITHOUT learning."""
     if not content.strip():
-        return "Please enter some content.", None, None, None
+        return "Please enter content to check."
 
-    neural_result = neural.observe(content)
-    rag_result = rag.store(content)
+    # REAL surprise computation (no learning)
+    surprise = memory.surprise(content)
 
-    gauge_fig = create_surprise_gauge(neural_result["surprise"], neural_result["momentum"])
-    history_fig = create_history_plot()
-    comparison_fig = create_comparison_chart()
+    return f"""## Surprise Check (No Learning)
 
-    learned_text = "YES" if neural_result["learned"] else "NO (below threshold)"
-    result = f"""### Observation Results
+**Content:** "{content[:100]}{'...' if len(content) > 100 else ''}"
 
-**Content:** "{content[:50]}{'...' if len(content) > 50 else ''}"
+**Surprise Score:** {surprise:.4f}
 
-| Metric | Neural Memory | RAG |
-|--------|--------------|-----|
-| Novelty | Surprise: {neural_result['surprise']:.3f} | Similarity: {rag_result['similarity']:.2f} |
-| Action | Learned: {learned_text} | Stored vector #{rag_result['vector_count']} |
-| Memory | Forgot: {neural_result['forgot']:.4f} | +{len(content)} bytes |
-| Capacity | Fixed parameters | {rag_result['storage_bytes']} bytes total |
+Interpretation:
+- **< 0.3**: Very familiar - memory has seen similar patterns
+- **0.3 - 0.6**: Moderately novel
+- **> 0.6**: Highly novel - worth learning
 
-**Interpretation:**
-{"🔴 HIGH surprise - this is novel content, worth learning!" if neural_result['surprise'] > 0.6 else "🟡 MODERATE surprise - somewhat familiar content." if neural_result['surprise'] > 0.3 else "🟢 LOW surprise - very familiar, minimal learning needed."}
+{'This content is FAMILIAR to the memory.' if surprise < 0.3 else 'This content is NOVEL to the memory.' if surprise > 0.6 else 'This content is somewhat familiar.'}
 """
-    return result, gauge_fig, history_fig, comparison_fig
+
+
+def get_memory_stats() -> str:
+    """Get real memory statistics."""
+    stats = memory.get_stats()
+
+    return f"""## Memory Statistics
+
+| Metric | Value |
+|--------|-------|
+| **Total Observations** | {stats['total_observations']} |
+| **Parameters** | {stats['weight_parameters']:,} |
+| **Dimension** | {stats['dimension']} |
+| **Learning Rate** | {stats['learning_rate']:.4f} |
+| **Avg Recent Surprise** | {stats['avg_surprise']:.4f} |
+| **Current Weight Hash** | `{memory.get_weight_hash()}` |
+
+### This is a Real Neural Network
+
+- **Architecture**: 2-layer MLP with GELU activation and LayerNorm
+- **Framework**: PyTorch with autograd
+- **Learning**: Test-time training via gradient descent
+- **Memory**: ~{stats['weight_parameters'] * 4 / 1024:.1f} KB of weights
+
+Unlike RAG which stores vectors in a database, this IS the memory.
+The weights encode everything learned.
+"""
 
 
 # =============================================================================
-# METRICS & USE CASES
+# DOCKER ECOSYSTEM INTEGRATION
 # =============================================================================
 
-USE_CASES_MD = """
-## Use Cases & Evidence
+DOCKER_INTEGRATION_MD = """
+## Docker Ecosystem Integration
 
-### 1. Long-Context Understanding (2M+ tokens)
-| Model | Accuracy at 2M tokens | Memory Type |
-|-------|----------------------|-------------|
-| Titans (MAC) | **98.2%** | Neural Memory |
-| Llama 3.1 8B + RAG | 71.3% | Retrieval |
-| GPT-4 Turbo | 54.1% | Fixed Context |
+This neural memory is designed for **containerized deployment** with full Docker integration.
 
-*Source: Titans paper, needle-in-haystack benchmark*
+### MCP Server Interface
+
+The memory exposes tools via Model Context Protocol (MCP):
+
+```python
+# MCP Tools Available
+@mcp.tool()
+def observe(content: str) -> dict:
+    '''Feed context, trigger learning.'''
+    return memory.observe(content)
+
+@mcp.tool()
+def surprise(content: str) -> float:
+    '''Measure novelty without learning.'''
+    return memory.surprise(content)
+
+@mcp.tool()
+def checkpoint(name: str) -> str:
+    '''Save learned state to Docker volume.'''
+    return save_checkpoint(name)
+
+@mcp.tool()
+def restore(name: str) -> str:
+    '''Load previous state from Docker volume.'''
+    return load_checkpoint(name)
+```
+
+### Docker Compose Deployment
+
+```yaml
+version: '3.8'
+services:
+  neural-memory:
+    build: .
+    ports:
+      - "8000:8000"  # MCP server
+    volumes:
+      - memory-state:/app/checkpoints  # Persistent state
+    environment:
+      - MEMORY_DIM=512
+      - LEARNING_RATE=0.01
+
+volumes:
+  memory-state:  # State survives container restarts
+```
+
+### Key Docker-Native Features
+
+| Feature | Implementation |
+|---------|---------------|
+| **State Persistence** | Docker volumes for checkpoints |
+| **Horizontal Scaling** | Stateless inference, shared state via volume |
+| **CI/CD Integration** | GitHub Actions with Docker build |
+| **Resource Control** | Container limits for GPU/memory |
+| **Health Checks** | `/health` endpoint with memory stats |
+
+### Why Docker + Neural Memory?
+
+1. **Containerized AI Memory**: Package learned state with your app
+2. **Version Control**: Checkpoint states like Git commits
+3. **Reproducibility**: Same container = same behavior
+4. **Orchestration Ready**: Deploy to Kubernetes, ECS, etc.
+5. **MCP Protocol**: Claude Desktop integration via container
 
 ---
 
-### 2. Parameter Efficiency
-| Model | Parameters | BABILong Score |
-|-------|-----------|----------------|
-| Titans-MAC | **760M** | 93.2% |
-| Llama 3.1 + RAG | 8B (10x more) | 89.1% |
+*This project demonstrates production-grade AI infrastructure with Docker.*
+"""
 
-**Neural Memory achieves better results with 70x fewer parameters!**
+ABOUT_MD = """
+## About This Project
 
----
+### What Makes This Special
 
-### 3. Continuous Learning
-| Scenario | RAG | Neural Memory |
-|----------|-----|---------------|
-| Same fact 3x | 3 vectors stored | Surprise: 0.9 → 0.2 |
-| Paraphrase | New vector (no recognition) | Recognized (moderate surprise) |
-| After 1000 facts | 1000 vectors | Same fixed capacity |
+This is **NOT a simulation**. The demo runs real PyTorch code:
 
----
+1. **Real Neural Network**: 2-layer MLP with ~250K parameters
+2. **Real Gradient Descent**: `torch.autograd.grad()` computes gradients
+3. **Real Weight Updates**: Parameters change during inference
+4. **Real Surprise Metric**: MSE loss measures prediction error
 
-### 4. Real-World Applications
+### The Titans Architecture
 
-**Code Assistant Memory:**
-- Remember coding patterns across sessions
-- Learn project-specific conventions
-- Forget outdated patterns automatically
+Based on Google's December 2024 paper: [arxiv.org/abs/2501.00663](https://arxiv.org/abs/2501.00663)
 
-**Document Analysis:**
-- Process entire codebases (2M+ tokens)
-- Learn document structure on-the-fly
-- No re-indexing needed
+**Key Innovation**: The memory IS a neural network. Instead of storing vectors,
+it learns patterns by updating weights during inference.
 
-**Conversational AI:**
-- Remember user preferences
-- Adapt to communication style
-- Bounded memory (privacy-friendly)
+### Docker Integration
 
----
+- **MCP Server**: Model Context Protocol for Claude Desktop
+- **Checkpoints**: Save/restore learned state via Docker volumes
+- **Container-Native**: Designed for orchestrated deployment
 
-### Key Metrics Explained
+### Built By
 
-| Metric | What It Measures | Why It Matters |
-|--------|-----------------|----------------|
-| **Surprise** | Gradient-based novelty | Decides what to learn |
-| **Momentum** | Surprise over time | Captures event flow |
-| **Forgetting** | Weight decay rate | Prevents overflow |
-| **Weight Delta** | Learning magnitude | Shows active learning |
+**Carlos Crespo Macaya**
+AI Engineer - GenAI Systems & Applied MLOps
 
----
+- 10+ years production ML experience
+- Expert in Docker, Kubernetes, MCP servers
+- Currently at HP AICoE building multi-agent systems
 
-*Based on Google's Titans paper (Dec 2024) and TTT research (Jul 2024)*
+This project demonstrates the ability to:
+1. Read cutting-edge research (Titans paper)
+2. Implement it correctly (PyTorch TTT)
+3. Productionize it (Docker, MCP, CI/CD)
+4. Make it compelling (this demo)
+
+**Contact:** [macayaven@gmail.com](mailto:macayaven@gmail.com)
+
+**GitHub:** [macayaven/docker-neural-memory](https://github.com/macayaven/docker-neural-memory)
 """
 
 
@@ -663,131 +336,73 @@ USE_CASES_MD = """
 # GRADIO INTERFACE
 # =============================================================================
 
-with gr.Blocks(title="Neural Memory vs RAG - Interactive Demo", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
     gr.Markdown("""
-    # Neural Memory vs RAG
-    ## Memory that LEARNS vs Memory that STORES
+    # Docker Neural Memory
+    ## Real Test-Time Training - Not a Simulation
 
-    An interactive, step-by-step guide to understanding the difference.
+    This demo runs **actual PyTorch** code. When you observe content,
+    real gradients flow and real weights update.
     """)
 
     with gr.Tabs():
-        # TAB 1: GUIDED TOUR
-        with gr.TabItem("📚 Learn (Guided Tour)"):
-            gr.Markdown("### Follow along step-by-step to understand the key concepts")
+        # TAB 1: Live Demo
+        with gr.TabItem("Live Demo"):
+            gr.Markdown("### Watch Real Neural Learning")
 
             with gr.Row():
                 with gr.Column(scale=1):
-                    step_title = gr.Markdown(value=f"## {TOUR_STEPS[0]['title']}")
-                    step_content = gr.Markdown(value=TOUR_STEPS[0]["content"])
-
-                    with gr.Row():
-                        prev_btn = gr.Button("← Previous", variant="secondary", size="sm")
-                        run_btn = gr.Button("▶ Run This Step", variant="primary", size="lg")
-                        next_btn = gr.Button("Next →", variant="secondary", size="sm")
-
-                    reset_tour_btn = gr.Button("🔄 Restart Tour", variant="secondary", size="sm")
-                    step_result = gr.Markdown()
+                    observe_input = gr.Textbox(
+                        label="Content to Observe",
+                        placeholder="Enter text to trigger real learning...",
+                        lines=3,
+                    )
+                    observe_btn = gr.Button("Observe (Learn)", variant="primary", size="lg")
+                    observe_output = gr.Markdown()
 
                 with gr.Column(scale=1):
-                    gauge_plot = gr.Plot(label="Surprise & Momentum")
-                    weights_plot = gr.Plot(label="Neural Weights")
+                    weights_plot = gr.Plot(label="Neural Weights (Real PyTorch)")
 
-            with gr.Row():
-                history_plot = gr.Plot(label="Learning History")
-                comparison_plot = gr.Plot(label="Neural vs RAG Comparison")
+            history_plot = gr.Plot(label="Learning History")
 
-            # Event handlers
-            def update_step_display(title, content):
-                return f"## {title}", content
-
-            prev_btn.click(prev_step, outputs=[step_title, step_content])
-            next_btn.click(next_step, outputs=[step_title, step_content])
-            run_btn.click(run_step, outputs=[step_result, gauge_plot, weights_plot, history_plot, comparison_plot])
-            reset_tour_btn.click(reset_tour, outputs=[step_title, step_content])
-
-        # TAB 2: PLAYGROUND
-        with gr.TabItem("🎮 Playground"):
-            gr.Markdown("""
-            ### Experiment Freely
-
-            Try your own content and see how both systems respond!
-
-            **Suggestions to try:**
-            1. Enter the same text multiple times → watch surprise drop
-            2. Try paraphrases → see if neural memory recognizes them
-            3. Enter completely new topics → see high surprise
-            4. Watch the history graph build up
-            """)
-
-            with gr.Row():
-                playground_input = gr.Textbox(
-                    label="Content to observe",
-                    placeholder="Enter any text... try repeating it!",
-                    lines=2
-                )
-                playground_btn = gr.Button("Observe", variant="primary", size="lg")
-
-            playground_result = gr.Markdown()
-
-            with gr.Row():
-                pg_gauge = gr.Plot(label="Surprise & Momentum")
-                pg_history = gr.Plot(label="Learning History")
-
-            pg_comparison = gr.Plot(label="Neural vs RAG Comparison")
-
-            with gr.Row():
-                reset_pg_btn = gr.Button("🔄 Reset Both Systems", variant="secondary")
-
-            playground_btn.click(
-                playground_observe,
-                inputs=[playground_input],
-                outputs=[playground_result, pg_gauge, pg_history, pg_comparison]
+            observe_btn.click(
+                observe_content,
+                inputs=[observe_input],
+                outputs=[observe_output, weights_plot, history_plot],
             )
-            reset_pg_btn.click(reset_all, outputs=[playground_result])
 
-        # TAB 3: USE CASES & METRICS
-        with gr.TabItem("📊 Evidence & Use Cases"):
-            gr.Markdown(USE_CASES_MD)
+            gr.Markdown("---")
 
-        # TAB 4: ABOUT
+            with gr.Row():
+                with gr.Column():
+                    surprise_input = gr.Textbox(
+                        label="Check Surprise (No Learning)",
+                        placeholder="Check novelty without updating weights...",
+                    )
+                    surprise_btn = gr.Button("Check Surprise")
+                    surprise_output = gr.Markdown()
+                    surprise_btn.click(check_surprise, inputs=[surprise_input], outputs=[surprise_output])
+
+                with gr.Column():
+                    stats_btn = gr.Button("Get Memory Stats")
+                    stats_output = gr.Markdown()
+                    stats_btn.click(get_memory_stats, outputs=[stats_output])
+
+            reset_btn = gr.Button("Reset Memory", variant="secondary")
+            reset_output = gr.Markdown()
+            reset_btn.click(reset_memory, outputs=[reset_output])
+
+        # TAB 2: Docker Integration
+        with gr.TabItem("Docker Integration"):
+            gr.Markdown(DOCKER_INTEGRATION_MD)
+
+        # TAB 3: About
         with gr.TabItem("About"):
-            gr.Markdown("""
-            ## About This Demo
-
-            **Docker Neural Memory** implements test-time training (TTT) memory based on Google's Titans architecture.
-
-            ### Key Papers
-            - [Titans: Learning to Memorize at Test Time](https://arxiv.org/abs/2501.00663) (Dec 2024)
-            - [Learning to Learn at Test Time](https://arxiv.org/abs/2407.04620) (Jul 2024)
-
-            ### The Core Innovation
-
-            Traditional AI memory (RAG) is like a **filing cabinet**:
-            - Store documents → Retrieve by similarity → No learning
-
-            Neural Memory (Titans) is like a **brain**:
-            - Observe content → Update weights (learn) → Forget old info → Generalize
-
-            ### Built By
-
-            **Carlos Crespo Macaya**
-            AI Engineer - GenAI Systems & Applied MLOps
-
-            - 10+ years production ML experience
-            - Expert in Docker, Kubernetes, MCP servers
-            - Currently building AI systems at HP AICoE
-
-            📧 [macayaven@gmail.com](mailto:macayaven@gmail.com)
-
-            ---
-
-            *This project demonstrates the ability to take cutting-edge research and ship production-ready infrastructure.*
-            """)
+            gr.Markdown(ABOUT_MD)
 
     gr.Markdown("""
     ---
-    *Docker Neural Memory - Containerized AI memory that actually learns*
+    *Docker Neural Memory - Containerized AI memory with real test-time training*
 
     [GitHub](https://github.com/macayaven/docker-neural-memory) |
     [Contact](mailto:macayaven@gmail.com)
