@@ -309,7 +309,7 @@ Watch what happens:
         "action": "Docker containers provide process isolation",
     },
     {
-        "title": "Step 2: Repetition → Learning",
+        "title": "Step 2: Repetition = Learning",
         "content": """## Same Content Again
 
 Now we'll teach the SAME thing: **"Docker containers provide process isolation"**
@@ -380,21 +380,103 @@ Watch the "Forgot" metric - old, less relevant information decays.
         "action": "Kubernetes orchestrates container deployments",
     },
     {
-        "title": "Summary: The Key Differences",
-        "content": """## What You Just Learned
+        "title": "Step 6: What This Enables",
+        "content": """## Capabilities Unlocked by Neural Memory
 
-| Aspect | Neural Memory (Titans) | RAG |
-|--------|----------------------|-----|
-| **Mechanism** | Encodes in parameters | Retrieves from database |
-| **Repetition** | Surprise DECREASES | Just stores again |
-| **Paraphrase** | Recognizes similarity | Needs exact match |
-| **Capacity** | Fixed (with forgetting) | Unbounded growth |
-| **Learning** | Continuous, during inference | None (static retrieval) |
+These mechanisms enable powerful new functionalities:
 
-**The Key Insight:**
-Neural Memory doesn't just STORE information - it LEARNS and SYNTHESIZES it.
+### 1. Extreme Long Context (2M+ tokens)
+Process entire codebases, books, or document collections in a single pass.
+RAG struggles with context fragmentation; Neural Memory synthesizes continuously.
 
-**Now try the Playground tab to experiment yourself!**
+### 2. Test-Time Adaptation
+The model keeps learning DURING inference. Feed it your coding style,
+your domain terminology, your preferences - it adapts on the fly.
+
+### 3. No Re-indexing Required
+Traditional RAG needs to re-embed documents when they change.
+Neural Memory learns incrementally - just observe the new content.
+
+### 4. Privacy-Friendly Bounded Memory
+Fixed capacity means you control exactly how much is remembered.
+Old information naturally decays - no accumulating sensitive data forever.
+
+### 5. Semantic Compression
+Instead of storing raw text, Neural Memory distills PATTERNS.
+This is why it achieves 98% accuracy with 70x fewer parameters than RAG.
+
+**Click "Next Step" to understand the trade-offs...**
+""",
+        "action": None,
+    },
+    {
+        "title": "Step 7: Honest Drawbacks",
+        "content": """## When RAG Might Be Better
+
+No technology is perfect. Here's when Neural Memory has limitations:
+
+### Drawbacks of Neural Memory:
+
+**1. Forgetting Can Lose Important Info**
+The adaptive forgetting mechanism might decay critical facts if not reinforced.
+RAG's explicit storage guarantees nothing is lost.
+
+**2. Less Interpretable**
+RAG can show you exactly which documents it retrieved.
+Neural Memory's knowledge is encoded in weights - harder to audit.
+
+**3. No Exact Retrieval**
+Need to quote a specific passage verbatim? RAG excels here.
+Neural Memory synthesizes - it may paraphrase or miss exact wording.
+
+**4. Compute Overhead**
+Online learning during inference adds computational cost.
+RAG's vector lookup is simpler and faster for basic retrieval.
+
+**5. Newer, Less Battle-Tested**
+RAG has years of production deployment experience.
+Neural Memory (Titans) is cutting-edge research (Dec 2024).
+
+### The Right Choice Depends on Your Use Case:
+- **Use RAG** for: Exact quotes, audit trails, simple Q&A, proven stability
+- **Use Neural Memory** for: Long context, adaptation, compression, learning
+
+**Click "Next Step" for the summary!**
+""",
+        "action": None,
+    },
+    {
+        "title": "Summary: Making the Right Choice",
+        "content": """## What You've Learned
+
+### The Core Mechanisms
+
+| Feature | Neural Memory | RAG |
+|---------|--------------|-----|
+| **Surprise** | Measures novelty via gradients | N/A |
+| **Momentum** | Tracks activity over time | N/A |
+| **Forgetting** | Adaptive weight decay | Never forgets |
+| **Learning** | Continuous, during inference | None |
+
+### When to Use Each
+
+| Use Case | Best Choice | Why |
+|----------|-------------|-----|
+| Long documents (2M+ tokens) | Neural Memory | Handles extreme context |
+| Exact quote retrieval | RAG | Explicit storage |
+| Adapting to user style | Neural Memory | Test-time learning |
+| Audit/compliance needs | RAG | Interpretable retrieval |
+| Resource-constrained | Neural Memory | 70x fewer parameters |
+| Production stability | RAG | Battle-tested |
+
+### The Key Insight
+
+Neural Memory **LEARNS and FORGETS** like a brain.
+RAG **STORES and RETRIEVES** like a filing cabinet.
+
+Neither is universally better - choose based on your needs.
+
+**Try the Playground tab to experiment yourself!**
 """,
         "action": None,
     },
