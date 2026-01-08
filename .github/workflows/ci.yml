@@ -114,7 +114,16 @@ jobs:
         run: |
           if [ -n "$HF_TOKEN" ]; then
             pip install huggingface_hub
-            python -m huggingface_hub.commands.huggingface_cli upload macayaven/docker-neural-memory deploy/huggingface . --repo-type space
+            python -c "
+from huggingface_hub import HfApi
+api = HfApi()
+api.upload_folder(
+    folder_path='deploy/huggingface',
+    repo_id='macayaven/docker-neural-memory',
+    repo_type='space'
+)
+print('Deployed to HuggingFace Spaces!')
+"
           else
             echo "HF_TOKEN not set, skipping deployment"
           fi
