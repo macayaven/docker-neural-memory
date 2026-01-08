@@ -99,8 +99,18 @@ check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "transformers.*", "edge_tts.*", "gradio.*", "langfuse.*"]
+module = ["torch.*", "transformers.*", "edge_tts.*", "gradio.*", "langfuse.*", "pydantic_settings", "pydantic_settings.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["src.memory.neural_memory", "src.memory.ttt_layer", "src.config"]
+# These modules subclass torch.nn.Module and pydantic.BaseSettings which have type: Any
+disable_error_code = ["misc"]
+
+[[tool.mypy.overrides]]
+module = ["src.observability.metrics"]
+# Langfuse SDK doesn't have complete type stubs
+disable_error_code = ["attr-defined"]
 
 # Pytest configuration
 [tool.pytest.ini_options]

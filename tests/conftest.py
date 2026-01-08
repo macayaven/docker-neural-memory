@@ -36,7 +36,7 @@ def device():
     """Get available device."""
     if torch.cuda.is_available():
         return "cuda"
-    elif torch.backends.mps.is_available():
+    if torch.backends.mps.is_available():
         return "mps"
     return "cpu"
 
@@ -81,6 +81,7 @@ def diverse_texts():
 def memory_config():
     """Create a test memory configuration."""
     from src.config import MemoryConfig
+
     return MemoryConfig(dim=128, learning_rate=0.02, device="cpu")
 
 
@@ -88,6 +89,7 @@ def memory_config():
 def memory(memory_config):
     """Create a test neural memory instance."""
     from src.memory.neural_memory import NeuralMemory
+
     return NeuralMemory(memory_config)
 
 
@@ -96,4 +98,5 @@ def small_memory():
     """Create a small memory for fast tests."""
     from src.config import MemoryConfig
     from src.memory.neural_memory import NeuralMemory
+
     return NeuralMemory(MemoryConfig(dim=64, learning_rate=0.05, device="cpu"))

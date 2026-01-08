@@ -28,7 +28,7 @@ class MemoryConsolidator:
         self.fisher: dict[str, Tensor] = {}
         self.optimal: dict[str, Tensor] = {}
 
-    def compute_fisher(self, model: nn.Module, data_loader) -> None:
+    def compute_fisher(self, model: nn.Module, data_loader: list[Tensor]) -> None:
         """
         Compute Fisher information matrix for EWC.
 
@@ -76,13 +76,13 @@ class MemoryConsolidator:
         ewc_penalty = torch.tensor(0.0, device=current_loss.device)
         for name, param in model.named_parameters():
             if name in self.fisher:
-                ewc_penalty += (
-                    self.fisher[name] * (param - self.optimal[name]).pow(2)
-                ).sum()
+                ewc_penalty += (self.fisher[name] * (param - self.optimal[name]).pow(2)).sum()
 
         return current_loss + self.ewc_lambda * ewc_penalty
 
-    def consolidate(self, model: nn.Module, recent_observations: list[Tensor]) -> dict:
+    def consolidate(
+        self, model: nn.Module, recent_observations: list[Tensor]
+    ) -> dict[str, int | float]:
         """
         Perform consolidation pass.
 

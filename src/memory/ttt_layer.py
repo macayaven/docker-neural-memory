@@ -11,7 +11,7 @@ import copy
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as functional
 from torch import Tensor
 
 
@@ -34,6 +34,7 @@ class TTTLayer(nn.Module):
         super().__init__()
         self.dim = dim
         self.variant = variant
+        self.hidden_model: nn.Module
 
         if variant == "linear":
             # TTT-Linear: Hidden state is a linear model
@@ -64,7 +65,7 @@ class TTTLayer(nn.Module):
         Returns:
             Output tensor [batch, seq_len, dim]
         """
-        batch, seq_len, dim = x.shape
+        _batch, seq_len, _dim = x.shape
 
         # Clone hidden model for this sequence (mini-batch gradient descent)
         hidden_state = copy.deepcopy(self.hidden_model)
@@ -76,22 +77,20 @@ class TTTLayer(nn.Module):
 
             # Self-supervised target: reconstruct from key-value
             kv = self.to_kv(x_t)
-            k, v = kv.chunk(2, dim=-1)
+            _k, v = kv.chunk(2, dim=-1)
 
             # Forward through hidden state
             y_t = hidden_state(x_t)
 
             # Compute loss and update hidden state
-            loss = F.mse_loss(y_t, v)
+            loss = functional.mse_loss(y_t, v)
 
             # Compute gradients
-            grads = torch.autograd.grad(
-                loss, hidden_state.parameters(), create_graph=False
-            )
+            grads = torch.autograd.grad(loss, list(hidden_state.parameters()), create_graph=False)
 
             # Update hidden state weights
             with torch.no_grad():
-                for param, grad in zip(hidden_state.parameters(), grads):
+                for param, grad in zip(hidden_state.parameters(), grads, strict=True):
                     param -= self.eta * grad
 
             outputs.append(y_t.detach())

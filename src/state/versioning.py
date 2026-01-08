@@ -4,14 +4,17 @@ Memory versioning - fork and branch operations for neural memory.
 Enables experimentation without losing stable state.
 """
 
+from __future__ import annotations
+
 import shutil
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn as nn
 
-from .checkpoint import CheckpointManager
+if TYPE_CHECKING:
+    from .checkpoint import CheckpointManager
 
 
 @dataclass
@@ -41,7 +44,7 @@ class VersionManager:
         """
         self.checkpoint_mgr = checkpoint_manager
 
-    def fork(self, model: nn.Module, source_tag: str, new_tag: str) -> ForkInfo:
+    def fork(self, _model: nn.Module, source_tag: str, new_tag: str) -> ForkInfo:
         """
         Fork memory state into a new branch.
 
@@ -109,9 +112,7 @@ class VersionManager:
 
         return lineage
 
-    def diff_checkpoints(
-        self, model_class: type, tag1: str, tag2: str
-    ) -> dict[str, float]:
+    def diff_checkpoints(self, _model_class: type, tag1: str, tag2: str) -> dict[str, float]:
         """
         Compare two checkpoints and return weight differences.
 
@@ -137,7 +138,7 @@ class VersionManager:
 
     def learning_since_checkpoint(
         self, model: nn.Module, tag: str
-    ) -> dict[str, float]:
+    ) -> dict[str, str | float | dict[str, float] | int]:
         """
         Measure how much the model has learned since a checkpoint.
 

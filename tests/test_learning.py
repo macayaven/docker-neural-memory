@@ -4,11 +4,10 @@ Tests to verify that the neural memory actually learns.
 Key validation: surprise should decrease on repeated patterns.
 """
 
-import pytest
 import torch
 
 from src.memory.neural_memory import NeuralMemory
-from src.memory.ttt_layer import TTTLayer, TTTLinear, TTTMLP
+from src.memory.ttt_layer import TTTMLP, TTTLayer, TTTLinear
 
 
 class TestNeuralMemoryLearning:
@@ -29,8 +28,7 @@ class TestNeuralMemoryLearning:
 
         # Surprise should generally decrease (allowing some noise)
         assert surprises[-1] < surprises[0], (
-            f"Surprise should decrease: first={surprises[0]:.4f}, "
-            f"last={surprises[-1]:.4f}"
+            f"Surprise should decrease: first={surprises[0]:.4f}, last={surprises[-1]:.4f}"
         )
 
     def test_weights_update_during_observation(self):
@@ -46,7 +44,7 @@ class TestNeuralMemoryLearning:
 
         # Check weights changed
         weight_changed = False
-        for p, init in zip(memory.memory_net.parameters(), initial_weights):
+        for p, init in zip(memory.memory_net.parameters(), initial_weights, strict=True):
             if not torch.allclose(p, init):
                 weight_changed = True
                 break
@@ -66,7 +64,7 @@ class TestNeuralMemoryLearning:
         memory.infer(pattern)
 
         # Check weights unchanged
-        for p, init in zip(memory.memory_net.parameters(), initial_weights):
+        for p, init in zip(memory.memory_net.parameters(), initial_weights, strict=True):
             assert torch.allclose(p, init), "Weights should not change during infer"
 
     def test_different_patterns_have_different_surprise(self):
@@ -79,8 +77,8 @@ class TestNeuralMemoryLearning:
             memory.observe(pattern1)
 
         # Check surprise for learned vs new pattern
-        surprise_learned = memory.get_surprise(pattern1)
-        surprise_new = memory.get_surprise(torch.randn(1, 10, 64))
+        surprise_learned = memory.surprise(pattern1)
+        surprise_new = memory.surprise(torch.randn(1, 10, 64))
 
         assert surprise_new > surprise_learned, (
             f"New pattern should be more surprising: "

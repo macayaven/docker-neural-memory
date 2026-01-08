@@ -9,10 +9,12 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Generator
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from langfuse import Langfuse
     from langfuse.client import StatefulSpanClient, StatefulTraceClient
 
@@ -85,7 +87,7 @@ class MemoryObserver:
         """
         self.memory = memory
         self.langfuse = langfuse
-        self.session_id = session_id or f"session_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        self.session_id = session_id or f"session_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
 
         # Local metrics storage
         self._observations: list[MetricsSnapshot] = []
@@ -94,10 +96,12 @@ class MemoryObserver:
 
     def _get_timestamp(self) -> str:
         """Get ISO timestamp."""
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     @contextmanager
-    def _trace(self, name: str, **metadata: Any) -> Generator[StatefulSpanClient | None, None, None]:
+    def _trace(
+        self, name: str, **metadata: Any
+    ) -> Generator[StatefulSpanClient | None, None, None]:
         """Context manager for Langfuse tracing."""
         if self.langfuse is None:
             yield None
@@ -294,7 +298,9 @@ class MemoryObserver:
             "inference": {
                 "total_queries": len(self._inferences),
                 "avg_latency_ms": safe_avg(inf_latencies),
-                "p99_latency_ms": sorted(inf_latencies)[int(len(inf_latencies) * 0.99)] if inf_latencies else 0,
+                "p99_latency_ms": sorted(inf_latencies)[int(len(inf_latencies) * 0.99)]
+                if inf_latencies
+                else 0,
             },
             "memory": self.memory.get_stats(),
         }

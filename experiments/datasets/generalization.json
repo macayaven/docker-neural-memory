@@ -1,0 +1,69 @@
+{
+  "name": "generalization_verification",
+  "description": "Verify memory generalizes beyond exact matches",
+  "version": "1.0",
+  "tests": [
+    {
+      "id": "paraphrase_recognition",
+      "description": "Recognize paraphrased versions of learned content",
+      "learn": "Kubernetes automatically restarts failed containers",
+      "test_paraphrases": [
+        "K8s restarts containers that fail",
+        "When containers fail, Kubernetes restarts them",
+        "Failed containers are auto-restarted by Kubernetes",
+        "Container failures trigger Kubernetes restarts"
+      ],
+      "expected": {
+        "avg_surprise_max": 0.5,
+        "recognition_rate_min": 0.75
+      }
+    },
+    {
+      "id": "concept_transfer",
+      "description": "Learning about one example transfers to related concepts",
+      "learn": [
+        "Docker containers are lightweight VMs",
+        "Docker images are built from Dockerfiles",
+        "Docker Hub hosts container images"
+      ],
+      "test_novel": [
+        "Podman is an alternative to Docker",
+        "Container images can be pulled from registries",
+        "Containerization improves deployment consistency"
+      ],
+      "expected": {
+        "transfer_surprise_reduction_min": 0.2
+      }
+    },
+    {
+      "id": "abstraction_learning",
+      "description": "Learn abstract patterns from concrete examples",
+      "learn": [
+        "Python lists are mutable sequences",
+        "JavaScript arrays are mutable sequences",
+        "Ruby arrays are mutable sequences"
+      ],
+      "test_abstraction": "Programming languages often have mutable sequence types",
+      "expected": {
+        "abstraction_surprise_max": 0.6
+      }
+    },
+    {
+      "id": "negative_transfer",
+      "description": "Unrelated content should NOT benefit from prior learning",
+      "learn": [
+        "Machine learning uses gradient descent",
+        "Neural networks have layers of neurons",
+        "Backpropagation computes gradients"
+      ],
+      "test_unrelated": [
+        "The French Revolution began in 1789",
+        "Photosynthesis converts CO2 to oxygen",
+        "Shakespeare wrote Hamlet"
+      ],
+      "expected": {
+        "unrelated_surprise_min": 0.7
+      }
+    }
+  ]
+}

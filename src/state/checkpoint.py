@@ -7,7 +7,7 @@ Like `docker commit` but for neural memory weights.
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import torch
@@ -47,26 +47,26 @@ class CheckpointManager:
     def _load_metadata(self) -> None:
         """Load checkpoint metadata from disk."""
         if self.metadata_file.exists():
-            with open(self.metadata_file) as f:
+            with self.metadata_file.open() as f:
                 self.metadata = json.load(f)
         else:
             self.metadata = {"checkpoints": {}}
 
     def _save_metadata(self) -> None:
         """Save checkpoint metadata to disk."""
-        with open(self.metadata_file, "w") as f:
+        with self.metadata_file.open("w") as f:
             json.dump(self.metadata, f, indent=2)
 
     def _compute_hash(self, model: nn.Module) -> str:
         """Compute hash of model weights for integrity verification."""
         hasher = hashlib.sha256()
         for param in model.parameters():
-            hasher.update(param.data.cpu().numpy().tobytes())
+            # Use string representation instead of numpy to avoid numpy dependency
+            data_str = str(param.data.cpu().flatten().tolist())
+            hasher.update(data_str.encode())
         return hasher.hexdigest()[:16]
 
-    def checkpoint(
-        self, model: nn.Module, tag: str, description: str = ""
-    ) -> CheckpointInfo:
+    def checkpoint(self, model: nn.Module, tag: str, description: str = "") -> CheckpointInfo:
         """
         Save current learned state as a named checkpoint.
 
@@ -89,7 +89,7 @@ class CheckpointManager:
 
         info = CheckpointInfo(
             tag=tag,
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             size_mb=round(size_mb, 2),
             weight_hash=weight_hash,
             description=description,

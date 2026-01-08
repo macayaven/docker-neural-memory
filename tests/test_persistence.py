@@ -4,7 +4,6 @@ Tests for state persistence - verifying learned state survives restart.
 
 import tempfile
 
-import pytest
 import torch
 
 from src.memory.neural_memory import NeuralMemory
@@ -27,7 +26,7 @@ class TestCheckpointPersistence:
                 memory.observe(pattern)
 
             # Get surprise before checkpoint
-            surprise_before = memory.get_surprise(pattern)
+            surprise_before = memory.surprise(pattern)
 
             # Checkpoint
             info = manager.checkpoint(memory, "test-v1", "Test checkpoint")
@@ -38,14 +37,14 @@ class TestCheckpointPersistence:
             for _ in range(10):
                 memory.observe(torch.randn(1, 10, 64))
 
-            # Surprise should be different now
-            surprise_after_more_learning = memory.get_surprise(pattern)
+            # Surprise should be different now (continue learning)
+            memory.surprise(pattern)
 
             # Restore
             manager.restore(memory, "test-v1")
 
             # Surprise should match pre-checkpoint
-            surprise_after_restore = memory.get_surprise(pattern)
+            surprise_after_restore = memory.surprise(pattern)
 
             assert abs(surprise_before - surprise_after_restore) < 0.01, (
                 f"State should restore exactly: before={surprise_before:.4f}, "
