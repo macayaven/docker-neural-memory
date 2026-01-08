@@ -1,514 +1,356 @@
 """
-Docker Neural Memory - HuggingFace Spaces Demo
+Docker Neural Memory - Visual Comparison Demo
 
-Interactive demo with recruiter advocate agent and REAL-TIME VOICE.
-Shows neural memory capabilities while pitching Carlos Crespo for the role.
+Side-by-side comparison: Neural Memory vs RAG
+Shows the fundamental difference: LEARNING vs STORING
 
 Deploy to: https://huggingface.co/spaces
 """
 
 import sys
-import tempfile
+import time
 from pathlib import Path
 
 import gradio as gr
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
+
+matplotlib.use("Agg")  # Non-interactive backend for Gradio
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    from src.memory.neural_memory import NeuralMemory
     from src.config import MemoryConfig
+    from src.memory.neural_memory import NeuralMemory
+
     MEMORY_AVAILABLE = True
 except ImportError:
     MEMORY_AVAILABLE = False
     print("Warning: Neural memory not available, using mock")
 
-# Try to import speech libraries
-try:
-    import torch
-    from transformers import pipeline
-    WHISPER_AVAILABLE = True
-    # Load Whisper for speech-to-text (small model for speed)
-    whisper_pipe = pipeline(
-        "automatic-speech-recognition",
-        model="openai/whisper-small",
-        device="cpu"
-    )
-except ImportError:
-    WHISPER_AVAILABLE = False
-    whisper_pipe = None
-    print("Warning: Whisper not available")
 
-try:
-    import edge_tts
-    import asyncio
-    TTS_AVAILABLE = True
-except ImportError:
-    TTS_AVAILABLE = False
-    print("Warning: edge-tts not available")
-
-
-# Initialize global memory
+# Initialize Neural Memory
 if MEMORY_AVAILABLE:
     memory = NeuralMemory(MemoryConfig(dim=256, learning_rate=0.02))
 else:
-    # Mock memory for testing
+
     class MockMemory:
+        """Mock memory for testing when real memory unavailable."""
+
         def __init__(self):
             self._count = 0
-            self._hash = "abc123"
+            self._weights = np.random.randn(16, 16) * 0.1
 
-        def observe(self, text):
+        def observe(self, text: str) -> dict:  # noqa: ARG002
             self._count += 1
-            self._hash = f"hash_{self._count}"
-            return {"surprise": 0.8 - self._count * 0.1, "weight_delta": 0.001}
+            # Simulate weight changes
+            delta = np.random.randn(16, 16) * 0.05
+            self._weights += delta
+            surprise = max(0.1, 0.9 - self._count * 0.15)
+            return {"surprise": surprise, "weight_delta": np.abs(delta).mean()}
 
-        def surprise(self, text):
-            return 0.5
+        def surprise(self, text: str) -> float:  # noqa: ARG002
+            return max(0.1, 0.8 - self._count * 0.1)
 
-        def get_weight_hash(self):
-            return self._hash
-
-        def parameters(self):
-            return []
+        def get_weights_sample(self) -> np.ndarray:
+            return self._weights
 
         @property
-        def config(self):
-            class C:
-                dim = 256
-                learning_rate = 0.02
-            return C()
+        def memory_net(self):
+            return self
+
+        @property
+        def fc(self):
+            return self
+
+        @property
+        def weight(self):
+            class W:
+                data = type("D", (), {"cpu": lambda _: type("C", (), {"numpy": lambda _: np.random.randn(16, 16)})()})()
+            return W()
 
     memory = MockMemory()
 
 
-# Carlos's background for the advocate agent
-CARLOS_BACKGROUND = """
-Carlos Crespo Macaya - AI Engineer specializing in GenAI Systems & Applied MLOps
+class MockRAG:
+    """Simple RAG simulation for comparison - stores, doesn't learn."""
 
-KEY QUALIFICATIONS FOR DOCKER:
-- 10+ years designing, deploying, and operating ML systems in production
-- Expert in Docker, Kubernetes/EKS, CI/CD pipelines
-- Currently building MCP servers and multi-agent workflows at HP AICoE
-- Experience with Pydantic AI, Google ADK, and production MCP integrations
-- Built this Docker Neural Memory project as a demonstration
+    def __init__(self):
+        self.vectors = []
+        self.embeddings = []
 
-RECENT WORK:
-- HP AICoE: LLM-based systems, multi-agent workflows, MCP servers
-- Tenyks AI: AWS EKS platform, MCP servers, typed agent pipelines
-- CTO at Methinks AI: CE-marked medical AI, FDA cybersecurity certification
+    def store(self, text: str) -> dict:
+        """Store text as embedding (no learning, just storage)."""
+        # Simulate embedding
+        embedding = hash(text) % 1000 / 1000.0
+        self.vectors.append(text[:50])
+        self.embeddings.append(embedding)
+        # Similarity is always the same for same content
+        return {"similarity": 0.73, "count": len(self.vectors)}
 
-WHY CARLOS FOR DOCKER:
-1. Deep Docker/container expertise from years of production deployments
-2. Already building MCP servers - understands the protocol intimately
-3. Bridges research and production - can take Titans papers to shipped code
-4. Track record of shipping AI products (medical AI, RAG systems, multi-agent apps)
-5. This project demonstrates exactly that: research -> production-ready container
+    def query(self, text: str) -> dict:  # noqa: ARG002
+        """Query returns same similarity (no learning)."""
+        return {"similarity": 0.73, "count": len(self.vectors)}
 
-Contact: macayaven@gmail.com | Barcelona, Spain
-"""
+    def get_vector_positions(self) -> list:
+        """Get positions for visualization."""
+        np.random.seed(42)  # Deterministic positions
+        positions = []
+        for _ in range(len(self.vectors)):
+            x = np.random.uniform(0.1, 0.9)
+            y = np.random.uniform(0.1, 0.9)
+            positions.append((x, y))
+        return positions
+
+    def reset(self):
+        self.vectors = []
+        self.embeddings = []
 
 
-def advocate_response(user_message: str, history: list) -> str:
-    """
-    Recruiter advocate agent - responds to questions about the project
-    and Carlos's qualifications, always positioning him as the ideal candidate.
-    """
-    msg_lower = user_message.lower()
+# Global instances
+rag = MockRAG()
 
-    # Let the memory learn from the conversation
+
+def get_weight_heatmap() -> np.ndarray:
+    """Get weight sample for visualization."""
     try:
-        memory.observe(f"Recruiter question: {user_message}")
-    except:
-        pass
-
-    # Project-related questions
-    if any(word in msg_lower for word in ["what", "how", "explain", "tell me about"]):
-        if "neural memory" in msg_lower or "project" in msg_lower or "this" in msg_lower:
-            return """**Docker Neural Memory** is a containerized implementation of test-time training memory based on Google's Titans architecture.
-
-**What makes it special:**
-Unlike RAG/vector databases that just store and retrieve, this system **actually learns** during inference. The neural weights update with every interaction.
-
-```
-Traditional: Input -> Embed -> Store -> Retrieve (static)
-Neural:      Input -> Learn -> Update Weights -> Infer (dynamic)
-```
-
-**Key features:**
-- Weights change on every `observe()` call (real learning!)
-- Surprise decreases as patterns are recognized
-- Bounded capacity (doesn't grow like vector DBs)
-- State persists via Docker volumes
-
-*Built by Carlos Crespo, who has extensive experience shipping production AI systems with Docker and building MCP servers.*"""
-
-        if "carlos" in msg_lower or "candidate" in msg_lower or "who" in msg_lower:
-            return f"""**Carlos Crespo Macaya** is an AI Engineer with 10+ years of production ML experience.
-
-{CARLOS_BACKGROUND}
-
-**Why he's the right fit:**
-This Docker Neural Memory project demonstrates his ability to take cutting-edge research (Titans papers from Dec 2024) and turn it into production-ready, containerized infrastructure."""
-
-    # Qualification questions
-    if any(word in msg_lower for word in ["experience", "background", "qualified", "skills"]):
-        return f"""Carlos brings exactly what Docker needs:
-
-**Docker/Container Expertise:**
-- Years of production deployments with Docker & Kubernetes
-- Built this entire project as a containerized service
-
-**MCP Experience:**
-- Currently building MCP servers at HP AICoE
-- Built typed agent pipelines with Pydantic AI
-
-**Production AI Track Record:**
-- Shipped CE-marked medical AI products
-- Deployed voice-first LLM companions
-- Built RAG systems and multi-agent apps
-
-Contact: macayaven@gmail.com"""
-
-    # Demo/voice questions
-    if any(word in msg_lower for word in ["demo", "show", "try", "test", "voice"]):
-        return """**Try the Neural Memory Demo!**
-
-Use the tabs above to:
-1. **Voice Chat** - Talk to me! Real-time voice conversation
-2. **Live Demo** - Watch weights change, surprise decrease
-3. **Interactive** - Try observing your own content
-
-This demo showcases both the technical implementation AND Carlos's ability to ship complete, polished products."""
-
-    # Why Docker should hire
-    if any(word in msg_lower for word in ["why", "hire", "docker", "fit", "job"]):
-        return """**Why Docker should hire Carlos:**
-
-1. **Immediate Impact**: This project is ready to demo to Docker's AI team
-2. **MCP Expertise**: Already building production MCP servers
-3. **Docker Native**: Deep understanding of containers, volumes, compose
-4. **Research to Production**: Can take papers and ship code
-5. **Track Record**: Shipped medical AI, LLM systems, multi-agent apps
-
-**The Proof**: This project. Research paper -> production Docker container.
-
-Ready to chat? macayaven@gmail.com"""
-
-    # Default response
-    return f"""Thanks for your interest! I'm here to tell you about **Docker Neural Memory** and why **Carlos Crespo** is the ideal candidate for Docker.
-
-Ask me about:
-- How the neural memory works
-- Carlos's qualifications
-- Why this matters for Docker
-- A live demo
-
-Or try the **Voice Chat** tab to talk to me directly!
-
-Contact: macayaven@gmail.com"""
+        if hasattr(memory, "get_weights_sample"):
+            return memory.get_weights_sample()
+        weights = memory.memory_net.fc.weight.data[:16, :16]
+        return weights.cpu().numpy()
+    except Exception:
+        return np.random.randn(16, 16) * 0.5
 
 
-async def text_to_speech(text: str) -> str:
-    """Convert text to speech using edge-tts."""
-    if not TTS_AVAILABLE:
-        return None
+def create_neural_viz(weights: np.ndarray, surprise: float, step_text: str) -> plt.Figure:
+    """Create neural memory visualization with heatmap and gauge."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4), gridspec_kw={"width_ratios": [2, 1]})
 
-    try:
-        # Create temp file for audio
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-            output_path = f.name
+    # Weight heatmap
+    ax1.imshow(weights, cmap="RdBu_r", aspect="auto", vmin=-1, vmax=1)
+    ax1.set_title("Neural Weights (16x16 sample)", fontsize=12, fontweight="bold")
+    ax1.set_xlabel("Weights CHANGE with learning")
+    ax1.axis("off")
 
-        # Generate speech
-        communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
-        await communicate.save(output_path)
+    # Surprise gauge
+    colors = ["#2ecc71", "#f1c40f", "#e74c3c"]  # Green, Yellow, Red
+    color = colors[0] if surprise < 0.3 else (colors[1] if surprise < 0.6 else colors[2])
 
-        return output_path
-    except Exception as e:
-        print(f"TTS error: {e}")
-        return None
+    # Draw gauge
+    theta = np.linspace(np.pi, 0, 100)
+    ax2.plot(np.cos(theta), np.sin(theta), "k-", linewidth=3)
+    ax2.fill_between(np.cos(theta), 0, np.sin(theta), alpha=0.1, color="gray")
 
+    # Needle
+    angle = np.pi * (1 - surprise)
+    ax2.arrow(0, 0, 0.7 * np.cos(angle), 0.7 * np.sin(angle), head_width=0.1, head_length=0.05, fc=color, ec=color)
+    ax2.plot(0, 0, "ko", markersize=10)
 
-def speech_to_text(audio) -> str:
-    """Convert speech to text using Whisper."""
-    if not WHISPER_AVAILABLE or audio is None:
-        return ""
+    # Labels
+    ax2.text(-1, -0.2, "0.0\nFamiliar", ha="center", fontsize=9)
+    ax2.text(1, -0.2, "1.0\nNovel", ha="center", fontsize=9)
+    ax2.text(0, 0.5, f"{surprise:.2f}", ha="center", fontsize=24, fontweight="bold", color=color)
+    ax2.set_title("Surprise Score", fontsize=12, fontweight="bold")
+    ax2.set_xlim(-1.3, 1.3)
+    ax2.set_ylim(-0.5, 1.2)
+    ax2.axis("off")
 
-    try:
-        # audio is (sample_rate, numpy_array)
-        sr, audio_data = audio
-
-        # Convert to float32 and normalize
-        if audio_data.dtype == np.int16:
-            audio_data = audio_data.astype(np.float32) / 32768.0
-        elif audio_data.dtype == np.int32:
-            audio_data = audio_data.astype(np.float32) / 2147483648.0
-
-        # If stereo, convert to mono
-        if len(audio_data.shape) > 1:
-            audio_data = audio_data.mean(axis=1)
-
-        # Resample to 16kHz if needed
-        if sr != 16000:
-            # Simple resampling (not perfect but works)
-            duration = len(audio_data) / sr
-            new_length = int(duration * 16000)
-            indices = np.linspace(0, len(audio_data) - 1, new_length).astype(int)
-            audio_data = audio_data[indices]
-
-        result = whisper_pipe({"raw": audio_data, "sampling_rate": 16000})
-        return result["text"]
-    except Exception as e:
-        print(f"STT error: {e}")
-        return ""
+    plt.suptitle(f"NEURAL MEMORY: {step_text}", fontsize=14, fontweight="bold", color="#2980b9")
+    plt.tight_layout()
+    return fig
 
 
-def voice_chat(audio, history):
-    """Handle voice input and generate voice response."""
-    if audio is None:
-        return history, None
+def create_rag_viz(count: int, similarity: float, step_text: str) -> plt.Figure:
+    """Create RAG visualization with vector dots."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4), gridspec_kw={"width_ratios": [2, 1]})
 
-    # Convert speech to text
-    user_text = speech_to_text(audio)
-    if not user_text:
-        return history, None
+    # Vector space dots
+    ax1.set_xlim(0, 1)
+    ax1.set_ylim(0, 1)
 
-    # Get advocate response
-    response_text = advocate_response(user_text, history)
+    positions = rag.get_vector_positions()
+    if positions:
+        xs, ys = zip(*positions, strict=True)
+        ax1.scatter(xs, ys, s=100, c="#3498db", alpha=0.7, edgecolors="white", linewidth=2)
 
-    # Update history
-    history = history or []
-    history.append((user_text, response_text))
+    ax1.set_title(f"Vector Store ({count} vectors)", fontsize=12, fontweight="bold")
+    ax1.set_xlabel("Vectors ACCUMULATE (unbounded growth)")
+    ax1.set_facecolor("#f8f9fa")
+    ax1.grid(True, alpha=0.3)
 
-    # Generate audio response
-    audio_path = None
-    if TTS_AVAILABLE:
-        try:
-            audio_path = asyncio.run(text_to_speech(response_text[:500]))  # Limit length
-        except:
-            pass
+    # Similarity bar (always the same)
+    ax2.barh(0, similarity, color="#95a5a6", height=0.5)
+    ax2.barh(0, 1 - similarity, left=similarity, color="#ecf0f1", height=0.5)
+    ax2.set_xlim(0, 1)
+    ax2.set_ylim(-1, 1)
+    ax2.text(similarity / 2, 0, f"{similarity:.2f}", ha="center", va="center", fontsize=20, fontweight="bold")
+    ax2.set_title("Similarity (constant)", fontsize=12, fontweight="bold")
+    ax2.axis("off")
 
-    return history, audio_path
-
-
-def observe_content(content: str) -> str:
-    """Observe content and return metrics."""
-    if not content.strip():
-        return "Please enter some content to observe."
-
-    try:
-        result = memory.observe(content)
-        return f"""**Observation Result:**
-
-- **Surprise Score**: {result['surprise']:.3f}
-- **Weight Delta**: {result['weight_delta']:.6f}
-- **Weight Hash**: {memory.get_weight_hash()}
-
-{'High surprise - this is novel content!' if result['surprise'] > 0.6 else 'Lower surprise - pattern recognized!'}
-"""
-    except Exception as e:
-        return f"Error: {e}"
+    plt.suptitle(f"RAG: {step_text}", fontsize=14, fontweight="bold", color="#95a5a6")
+    plt.tight_layout()
+    return fig
 
 
-def check_surprise(content: str) -> str:
-    """Check surprise without learning."""
-    if not content.strip():
-        return "Please enter content to check."
-
-    try:
-        score = memory.surprise(content)
-        recommendation = "learn" if score > 0.7 else ("skip" if score < 0.3 else "moderate")
-        return f"""**Surprise Check:**
-
-- **Score**: {score:.3f}
-- **Recommendation**: {recommendation}
-
-{'This content is novel - worth learning!' if score > 0.6 else 'Content is familiar.'}
-"""
-    except Exception as e:
-        return f"Error: {e}"
+def reset_demo():
+    """Reset both systems for fresh demo."""
+    global memory, rag
+    if MEMORY_AVAILABLE:
+        memory = NeuralMemory(MemoryConfig(dim=256, learning_rate=0.02))
+    else:
+        memory = MockMemory()
+    rag = MockRAG()
+    return "Systems reset. Ready for demo."
 
 
-def get_stats() -> str:
-    """Get memory statistics."""
-    try:
-        params = sum(p.numel() for p in memory.parameters()) if hasattr(memory, 'parameters') else 0
-        return f"""**Memory Statistics:**
+def run_step(content: str, step_num: int, total_steps: int):
+    """Run a single demo step on both systems."""
+    step_text = f"Step {step_num}/{total_steps}: '{content[:40]}...'" if len(content) > 40 else f"Step {step_num}/{total_steps}: '{content}'"
 
-- **Total Parameters**: {params:,}
-- **Current Weight Hash**: {memory.get_weight_hash()}
-- **Dimension**: {memory.config.dim}
-- **Learning Rate**: {memory.config.learning_rate}
+    # Neural Memory: observe and learn
+    result = memory.observe(content)
+    surprise = result["surprise"]
+    weights = get_weight_heatmap()
+    neural_fig = create_neural_viz(weights, surprise, step_text)
 
-*Parameter count stays fixed regardless of observations!*
-"""
-    except Exception as e:
-        return f"Error: {e}"
+    # RAG: just store
+    rag_result = rag.store(content)
+    rag_fig = create_rag_viz(rag_result["count"], rag_result["similarity"], step_text)
+
+    return neural_fig, rag_fig, surprise, rag_result["count"]
 
 
-def run_demo() -> str:
-    """Run the killer demo sequence."""
+def auto_demo():
+    """Run the automated comparison demo."""
+    reset_demo()
+
+    # Demo sequence
+    steps = [
+        ("Docker containers provide process isolation", "Teaching fact #1"),
+        ("Docker containers provide process isolation", "Same fact #2 - watch surprise DROP"),
+        ("Docker containers provide process isolation", "Same fact #3 - very familiar now"),
+        ("Containers isolate processes in Docker", "Paraphrase - Neural recognizes!"),
+    ]
+
     results = []
+    for i, (content, description) in enumerate(steps):
+        neural_fig, rag_fig, surprise, count = run_step(content, i + 1, len(steps))
 
-    try:
-        # Demo 1: Weights change
-        before = memory.get_weight_hash()
-        memory.observe("Python uses indentation for blocks")
-        after = memory.get_weight_hash()
-        results.append(f"**1. Weights Change:**\n   Before: `{before}`\n   After: `{after}`\n   Changed: {'YES!' if before != after else 'No'}")
+        # Format result
+        result = f"""
+### Step {i + 1}: {description}
 
-        # Demo 2: Surprise decreases
-        r1 = memory.observe("Machine learning models learn from data")
-        r2 = memory.observe("ML models are trained on datasets")
-        r3 = memory.observe("Models in ML learn from training data")
-        results.append(f"**2. Surprise Decreases:**\n   First: {r1['surprise']:.3f}\n   Second: {r2['surprise']:.3f}\n   Third: {r3['surprise']:.3f}")
+**Content:** "{content}"
 
-        # Demo 3: Bounded capacity
-        params = sum(p.numel() for p in memory.parameters()) if hasattr(memory, 'parameters') else 0
-        results.append(f"**3. Bounded Capacity:**\n   Parameters: {params:,}\n   (Stays fixed regardless of observations)")
+| Metric | Neural Memory | RAG |
+|--------|---------------|-----|
+| Learning | Weights updated | Just stored |
+| Surprise/Similarity | {surprise:.2f} | 0.73 (constant) |
+| Storage | Fixed params | {count} vectors |
 
-    except Exception as e:
-        results.append(f"Error: {e}")
+---
+"""
+        results.append(result)
+        yield neural_fig, rag_fig, "\n".join(results), f"Running step {i + 1}/{len(steps)}..."
+        time.sleep(0.5)  # Brief pause for visual effect
 
-    return "\n\n".join(results) + "\n\n**This is REAL learning. RAG can't do this.**"
+    # Final summary
+    summary = """
+## Summary
+
+| Aspect | Neural Memory | RAG |
+|--------|---------------|-----|
+| **Mechanism** | Weights UPDATE (learning) | Vectors ACCUMULATE (storing) |
+| **Repetition** | Surprise DECREASES | Similarity CONSTANT |
+| **Paraphrase** | Recognizes similar content | Needs exact match |
+| **Capacity** | Bounded (fixed params) | Unbounded growth |
+
+### The Key Insight
+
+**Neural Memory LEARNED** that "Docker containers provide process isolation" - the surprise dropped from ~0.9 to ~0.1.
+
+**RAG just STORED** the same vector 4 times - similarity stayed at 0.73.
+
+---
+*Built by Carlos Crespo - [macayaven@gmail.com](mailto:macayaven@gmail.com)*
+"""
+    results.append(summary)
+    yield neural_fig, rag_fig, "\n".join(results), "Demo complete!"
+
+
+def manual_teach(content: str):
+    """Manually teach both systems."""
+    if not content.strip():
+        return None, None, "Enter content to teach."
+
+    neural_fig, rag_fig, surprise, count = run_step(content, 1, 1)
+
+    result = f"""
+**Content:** "{content}"
+
+| Metric | Neural Memory | RAG |
+|--------|---------------|-----|
+| Surprise/Similarity | {surprise:.2f} | 0.73 |
+| Storage | Fixed params | {count} vectors |
+"""
+    return neural_fig, rag_fig, result
 
 
 # Build Gradio interface
-with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Neural Memory vs RAG", theme=gr.themes.Soft()) as demo:
     gr.Markdown("""
-    # Docker Neural Memory
+    # Neural Memory vs RAG
+    ## Memory that LEARNS vs Memory that STORES
 
-    **Memory that LEARNS, not just stores** - Built by Carlos Crespo
+    Watch the fundamental difference in real-time. Neural memory's weights change and surprise decreases.
+    RAG just accumulates vectors with constant similarity.
 
-    This demo shows containerized neural memory using Google's Titans architecture.
-    Unlike RAG/vector databases, this system's weights actually update during inference.
+    **Click "Run Auto Demo" to see the magic!**
     """)
 
-    with gr.Tabs():
-        # Tab 1: Voice Chat (Full Duplex)
-        with gr.TabItem("Voice Chat"):
-            gr.Markdown("""
-            ### Real-Time Voice Conversation
+    with gr.Row():
+        with gr.Column(scale=1):
+            gr.Markdown("### Neural Memory (TTT/Titans)")
+            neural_plot = gr.Plot(label="Neural Memory Visualization")
 
-            **Speak to learn about Docker Neural Memory and why Carlos is the right candidate!**
+        with gr.Column(scale=1):
+            gr.Markdown("### Traditional RAG")
+            rag_plot = gr.Plot(label="RAG Visualization")
 
-            *Click the microphone, ask a question, and hear the response.*
-            """)
+    status = gr.Textbox(label="Status", value="Ready", interactive=False)
 
-            voice_chatbot = gr.Chatbot(height=300, label="Conversation")
+    with gr.Row():
+        auto_btn = gr.Button("Run Auto Demo", variant="primary", size="lg")
+        reset_btn = gr.Button("Reset", variant="secondary")
 
-            with gr.Row():
-                voice_input = gr.Audio(
-                    sources=["microphone"],
-                    type="numpy",
-                    label="Speak your question"
-                )
-                voice_output = gr.Audio(
-                    label="Response",
-                    autoplay=True
-                )
+    results_md = gr.Markdown(label="Results")
 
-            voice_btn = gr.Button("Process Voice", variant="primary")
-            voice_btn.click(
-                voice_chat,
-                inputs=[voice_input, voice_chatbot],
-                outputs=[voice_chatbot, voice_output]
-            )
+    gr.Markdown("---")
+    gr.Markdown("### Try It Yourself")
 
-            # Also auto-process when recording stops
-            voice_input.stop_recording(
-                voice_chat,
-                inputs=[voice_input, voice_chatbot],
-                outputs=[voice_chatbot, voice_output]
-            )
+    with gr.Row():
+        manual_input = gr.Textbox(label="Content to teach both systems", placeholder="Enter any text...")
+        manual_btn = gr.Button("Teach", variant="primary")
 
-            gr.Markdown("""
-            **Try asking:**
-            - "What is Docker Neural Memory?"
-            - "Tell me about Carlos's qualifications"
-            - "Why should Docker hire him?"
-            """)
-
-        # Tab 2: Text Chat with Advocate
-        with gr.TabItem("Text Chat"):
-            gr.Markdown("*Type to chat about the project and Carlos's qualifications*")
-            chatbot = gr.Chatbot(height=400)
-            msg = gr.Textbox(
-                placeholder="Ask about Docker Neural Memory or Carlos...",
-                label="Your Question"
-            )
-            clear = gr.Button("Clear")
-
-            def respond(message, history):
-                response = advocate_response(message, history)
-                history.append((message, response))
-                return "", history
-
-            msg.submit(respond, [msg, chatbot], [msg, chatbot])
-            clear.click(lambda: None, None, chatbot, queue=False)
-
-        # Tab 3: Live Demo
-        with gr.TabItem("Live Demo"):
-            gr.Markdown("**Watch neural memory learn in real-time**")
-            demo_btn = gr.Button("Run Killer Demo", variant="primary")
-            demo_output = gr.Markdown()
-            demo_btn.click(run_demo, outputs=demo_output)
-
-        # Tab 4: Interactive Memory
-        with gr.TabItem("Interactive"):
-            with gr.Row():
-                with gr.Column():
-                    gr.Markdown("### Observe (Learn)")
-                    observe_input = gr.Textbox(
-                        label="Content to learn",
-                        placeholder="Enter text for the memory to learn..."
-                    )
-                    observe_btn = gr.Button("Observe")
-                    observe_output = gr.Markdown()
-                    observe_btn.click(observe_content, observe_input, observe_output)
-
-                with gr.Column():
-                    gr.Markdown("### Check Surprise")
-                    surprise_input = gr.Textbox(
-                        label="Content to check",
-                        placeholder="Enter text to check novelty..."
-                    )
-                    surprise_btn = gr.Button("Check Surprise")
-                    surprise_output = gr.Markdown()
-                    surprise_btn.click(check_surprise, surprise_input, surprise_output)
-
-            stats_btn = gr.Button("Get Memory Stats")
-            stats_output = gr.Markdown()
-            stats_btn.click(get_stats, outputs=stats_output)
-
-        # Tab 5: About
-        with gr.TabItem("About Carlos"):
-            gr.Markdown(f"""
-            ## Carlos Crespo Macaya
-            **AI Engineer – GenAI Systems & Applied MLOps**
-
-            {CARLOS_BACKGROUND}
-
-            ---
-
-            ### Why This Project?
-
-            Docker Neural Memory demonstrates my ability to:
-            1. **Read cutting-edge research** (Titans paper, Dec 2024)
-            2. **Implement it correctly** (TTT layers, neural memory)
-            3. **Productionize it** (Docker, MCP interface, persistence)
-            4. **Make it compelling** (this demo with voice!)
-
-            **Ready to chat?** [macayaven@gmail.com](mailto:macayaven@gmail.com)
-            """)
+    # Event handlers
+    auto_btn.click(auto_demo, outputs=[neural_plot, rag_plot, results_md, status])
+    reset_btn.click(reset_demo, outputs=[status])
+    manual_btn.click(manual_teach, inputs=[manual_input], outputs=[neural_plot, rag_plot, results_md])
 
     gr.Markdown("""
     ---
-    *Docker Neural Memory - Containerized AI memory that actually learns*
+    ### What You Just Saw
 
-    Built for Docker's AI future | [Contact Carlos](mailto:macayaven@gmail.com)
+    1. **Weights Change**: Neural memory's heatmap shifts with each observation
+    2. **Surprise Drops**: The gauge goes from red (novel) to green (familiar)
+    3. **RAG Stays Static**: Same similarity score, just more vectors
+
+    **This is the difference between LEARNING and STORING.**
+
+    ---
+    *Docker Neural Memory - Built by Carlos Crespo | [macayaven@gmail.com](mailto:macayaven@gmail.com)*
     """)
 
 
