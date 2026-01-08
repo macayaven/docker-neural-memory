@@ -199,10 +199,7 @@ class NeuralMemory(nn.Module):
             self.lr.data = torch.tensor(learning_rate, device=self.config.device)
 
         # Encode if string
-        if isinstance(content, str):
-            x = self._encode_text(content)
-        else:
-            x = content
+        x = self._encode_text(content) if isinstance(content, str) else content
 
         # Store initial weights for delta calculation
         initial_weights = {
@@ -237,21 +234,18 @@ class NeuralMemory(nn.Module):
             "learned": weight_delta > 1e-6,
         }
 
-    def infer(self, query: str | Tensor, temperature: float = 1.0) -> dict:
+    def infer(self, query: str | Tensor, _temperature: float = 1.0) -> dict:
         """
         Query memory using learned representations (no learning).
 
         Args:
             query: Text string or tensor to query
-            temperature: Not used currently, for API compatibility
+            _temperature: Not used currently, for API compatibility
 
         Returns:
             dict with response tensor and confidence
         """
-        if isinstance(query, str):
-            x = self._encode_text(query)
-        else:
-            x = query
+        x = self._encode_text(query) if isinstance(query, str) else query
 
         with torch.no_grad():
             output = self.forward(x, learn=False)
@@ -273,10 +267,7 @@ class NeuralMemory(nn.Module):
         Returns:
             Surprise score between 0 (familiar) and 1 (novel)
         """
-        if isinstance(content, str):
-            x = self._encode_text(content)
-        else:
-            x = content
+        x = self._encode_text(content) if isinstance(content, str) else content
 
         with torch.no_grad():
             output = self.memory_net(x)
