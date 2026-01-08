@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  neural-memory:
+    build: .
+    volumes:
+      # Persistent learned state
+      - memory-weights:/app/weights
+      # Checkpoints for versioning
+      - memory-checkpoints:/app/checkpoints
+    environment:
+      - MEMORY_DIM=512
+      - TTT_VARIANT=mlp
+      - LEARNING_RATE=0.01
+    ports:
+      - "8765:8765"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8765)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  memory-weights:
+  memory-checkpoints:
