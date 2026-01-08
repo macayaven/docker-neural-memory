@@ -76,7 +76,7 @@ class TTTLayer(nn.Module):
 
             # Self-supervised target: reconstruct from key-value
             kv = self.to_kv(x_t)
-            k, v = kv.chunk(2, dim=-1)
+            _k, v = kv.chunk(2, dim=-1)
 
             # Forward through hidden state
             y_t = hidden_state(x_t)
