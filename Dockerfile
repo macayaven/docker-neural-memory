@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir torch transformers mcp pydantic uvicorn
 
 # Copy source code
 COPY src/ /app/src/
-COPY pyproject.toml /app/
+COPY pyproject.toml README.md /app/
 
 # Install package
 RUN pip install --no-cache-dir -e .
