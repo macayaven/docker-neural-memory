@@ -154,24 +154,42 @@ class ExperimentRunner:
                 expected = test.get("expected", {})
 
                 if "surprise_trend" in expected and expected["surprise_trend"] == "decreasing":
-                    # Check if trend is generally decreasing
-                    first_half_avg = sum(
-                        metrics["surprises"][: len(metrics["surprises"]) // 2]
-                    ) / max(1, len(metrics["surprises"]) // 2)
-                    second_half_avg = sum(
-                        metrics["surprises"][len(metrics["surprises"]) // 2 :]
-                    ) / max(1, len(metrics["surprises"]) - len(metrics["surprises"]) // 2)
-                    passed = passed and (second_half_avg < first_half_avg)
-                    metrics["trend_check"] = {
-                        "first_half_avg": first_half_avg,
-                        "second_half_avg": second_half_avg,
-                        "is_decreasing": second_half_avg < first_half_avg,
-                    }
+                    # Check if trend is generally decreasing (need at least 2 values)
+                    if len(metrics["surprises"]) >= 2:
+                        half_idx = len(metrics["surprises"]) // 2
+                        first_half = metrics["surprises"][:half_idx] or metrics["surprises"][:1]
+                        second_half = metrics["surprises"][half_idx:] or metrics["surprises"][-1:]
+                        first_half_avg = sum(first_half) / len(first_half)
+                        second_half_avg = sum(second_half) / len(second_half)
+                        passed = passed and (second_half_avg < first_half_avg)
+                        metrics["trend_check"] = {
+                            "first_half_avg": first_half_avg,
+                            "second_half_avg": second_half_avg,
+                            "is_decreasing": second_half_avg < first_half_avg,
+                        }
+                    else:
+                        # Single value can't show a trend
+                        metrics["trend_check"] = {"note": "Insufficient data for trend analysis"}
 
-                if "final_surprise_max" in expected:
+                if "final_surprise_max" in expected and metrics["surprises"]:
                     final = metrics["surprises"][-1]
                     passed = passed and (final <= expected["final_surprise_max"])
                     metrics["final_surprise"] = final
+
+                # Check transfer_ratio_min (ratio of final to initial surprise)
+                if "transfer_ratio_min" in expected and len(metrics["surprises"]) >= 2:
+                    transfer_ratio = 1.0 - (
+                        metrics["surprises"][-1] / max(0.01, metrics["surprises"][0])
+                    )
+                    metrics["transfer_ratio"] = transfer_ratio
+                    passed = passed and (transfer_ratio >= expected["transfer_ratio_min"])
+
+                # Check cross_domain_surprise_min
+                if "cross_domain_surprise_min" in expected and metrics["surprises"]:
+                    # Last surprise should still be high for cross-domain content
+                    passed = passed and (
+                        metrics["surprises"][-1] >= expected["cross_domain_surprise_min"]
+                    )
 
             elif "sequence" in test:
                 # Sequence with checkpoints/recalls
@@ -330,8 +348,11 @@ class ExperimentRunner:
             if isinstance(learns, str):
                 learns = [learns]
 
-            for content in learns:
-                self.memory.observe(content)
+            for i, content in enumerate(learns):
+                result = self.memory.observe(content)
+                if i == 0:
+                    # Track initial surprise for baseline comparison
+                    metrics["initial_learn_surprise"] = result["surprise"]
 
             # Test paraphrases
             if "test_paraphrases" in test:
@@ -371,9 +392,12 @@ class ExperimentRunner:
                     expected = test.get("expected", {})
                     # Check transfer learning reduction
                     if "transfer_surprise_reduction_min" in expected:
-                        # Compare to baseline surprise (no prior learning)
-                        baseline_surprise = 0.8  # Expected surprise without learning
+                        # Measure baseline by checking first novel surprise before learning
+                        # Use initial surprise from learning phase as baseline
+                        initial_surprise = metrics.get("initial_learn_surprise", 0.85)
+                        baseline_surprise = min(initial_surprise, 0.95)  # Cap at realistic max
                         reduction = baseline_surprise - avg_novel
+                        metrics["baseline_surprise"] = baseline_surprise
                         metrics["transfer_surprise_reduction"] = reduction
                         passed = passed and (
                             reduction >= expected["transfer_surprise_reduction_min"]
@@ -498,12 +522,16 @@ class ExperimentRunner:
 
                 # Record metrics for this observation count (guard against empty)
                 if surprises and latencies:
+                    sorted_latencies = sorted(latencies)
+                    # Fix p99 calculation for small samples
+                    p99_idx = min(int(len(sorted_latencies) * 0.99), len(sorted_latencies) - 1)
                     result_entry = {
                         "observation_count": obs_count,
                         "avg_surprise": sum(surprises) / len(surprises),
                         "final_surprise": surprises[-1],
+                        "max_surprise": max(surprises),
                         "avg_latency_ms": sum(latencies) / len(latencies),
-                        "p99_latency_ms": sorted(latencies)[int(len(latencies) * 0.99)],
+                        "p99_latency_ms": sorted_latencies[p99_idx],
                     }
                 else:
                     result_entry = {
@@ -526,6 +554,15 @@ class ExperimentRunner:
                 for result_entry in metrics["scaling_results"]:
                     if result_entry["p99_latency_ms"] > expected["latency_p99_max_ms"]:
                         passed = False
+                        break
+
+            # Check surprise_should_not_explode
+            if expected.get("surprise_should_not_explode"):
+                for result_entry in metrics["scaling_results"]:
+                    # Surprise should stay bounded (not explode beyond 1.0)
+                    if result_entry.get("max_surprise", 0) > 1.0:
+                        passed = False
+                        metrics["surprise_exploded"] = True
                         break
 
             if trace:
