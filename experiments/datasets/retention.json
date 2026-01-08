@@ -1,0 +1,51 @@
+{
+  "name": "retention_verification",
+  "description": "Verify memory retains learned patterns over time and interference",
+  "version": "1.0",
+  "tests": [
+    {
+      "id": "immediate_recall",
+      "description": "Recall immediately after learning",
+      "learn": ["Docker uses layers for efficient storage"],
+      "recall_delay": 0,
+      "recall": "Docker uses layers for efficient storage",
+      "expected": {
+        "surprise_max": 0.2
+      }
+    },
+    {
+      "id": "interference_resistance",
+      "description": "Original learning survives after new learning",
+      "sequence": [
+        {"learn": "Redis is an in-memory database"},
+        {"learn": "PostgreSQL is a relational database"},
+        {"learn": "MongoDB is a document database"},
+        {"learn": "SQLite is an embedded database"},
+        {"recall": "Redis is an in-memory database", "expect_surprise_max": 0.5}
+      ]
+    },
+    {
+      "id": "interleaved_domains",
+      "description": "Alternating domains should both be retained",
+      "sequence": [
+        {"learn": "Python has list comprehensions", "domain": "python"},
+        {"learn": "Docker Compose defines multi-container apps", "domain": "docker"},
+        {"learn": "Python supports async/await", "domain": "python"},
+        {"learn": "Docker networks connect containers", "domain": "docker"},
+        {"recall": "Python has list comprehensions", "expect_surprise_max": 0.4},
+        {"recall": "Docker Compose defines multi-container apps", "expect_surprise_max": 0.4}
+      ]
+    },
+    {
+      "id": "consolidation_benefit",
+      "description": "Consolidation should improve retention",
+      "sequence": [
+        {"learn": "Nginx is a reverse proxy server"},
+        {"learn": "Apache is a web server"},
+        {"learn": "Caddy provides automatic HTTPS"},
+        {"consolidate": true},
+        {"recall": "Nginx is a reverse proxy server", "expect_improvement": true}
+      ]
+    }
+  ]
+}

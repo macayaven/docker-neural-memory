@@ -1,0 +1,59 @@
+{
+  "name": "capacity_stress_test",
+  "description": "Test memory capacity limits and degradation patterns",
+  "version": "1.0",
+  "tests": [
+    {
+      "id": "scaling_test",
+      "description": "How does performance change with observation count",
+      "observation_counts": [10, 50, 100, 500, 1000, 5000],
+      "metrics_to_track": [
+        "avg_surprise",
+        "weight_delta_trend",
+        "inference_latency",
+        "memory_size_mb"
+      ],
+      "expected": {
+        "latency_p99_max_ms": 100,
+        "surprise_should_not_explode": true
+      }
+    },
+    {
+      "id": "saturation_detection",
+      "description": "Detect when memory is saturated",
+      "indicators": [
+        "weight_delta_approaches_zero",
+        "surprise_stops_decreasing",
+        "all_inputs_feel_familiar"
+      ],
+      "test_sequence": "continuous_unique_observations",
+      "max_observations": 10000
+    },
+    {
+      "id": "recovery_after_consolidation",
+      "description": "Consolidation should free up capacity",
+      "sequence": [
+        {"fill_to_saturation": true},
+        {"measure": "pre_consolidation_capacity"},
+        {"consolidate": true},
+        {"measure": "post_consolidation_capacity"},
+        {"expect": "capacity_increase"}
+      ]
+    },
+    {
+      "id": "dimension_vs_capacity",
+      "description": "How does memory dimension affect capacity",
+      "dimensions": [64, 128, 256, 512, 1024],
+      "observations_per_test": 1000,
+      "metrics": ["final_avg_surprise", "unique_patterns_retained"]
+    }
+  ],
+  "generators": {
+    "unique_observations": {
+      "template": "Fact {n}: {domain} {predicate} {object}",
+      "domains": ["Docker", "Kubernetes", "Python", "Go", "Rust", "JavaScript"],
+      "predicates": ["uses", "requires", "provides", "enables", "supports"],
+      "objects": ["containers", "async", "types", "modules", "packages", "networking"]
+    }
+  }
+}
