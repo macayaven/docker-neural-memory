@@ -525,6 +525,14 @@ class ExperimentRunner:
                     sorted_latencies = sorted(latencies)
                     # Fix p99 calculation for small samples
                     p99_idx = min(int(len(sorted_latencies) * 0.99), len(sorted_latencies) - 1)
+                    # Calculate memory size in MB from model parameters
+                    assert self.memory is not None  # Set by reset_memory()
+                    memory_size_mb = float(
+                        sum(
+                            p.nelement() * p.element_size()
+                            for p in self.memory.memory_net.parameters()
+                        )
+                    ) / (1024 * 1024)
                     result_entry = {
                         "observation_count": obs_count,
                         "avg_surprise": sum(surprises) / len(surprises),
@@ -532,6 +540,7 @@ class ExperimentRunner:
                         "max_surprise": max(surprises),
                         "avg_latency_ms": sum(latencies) / len(latencies),
                         "p99_latency_ms": sorted_latencies[p99_idx],
+                        "memory_size_mb": memory_size_mb,
                     }
                 else:
                     result_entry = {
@@ -540,12 +549,14 @@ class ExperimentRunner:
                         "final_surprise": 0.0,
                         "avg_latency_ms": 0.0,
                         "p99_latency_ms": 0.0,
+                        "memory_size_mb": 0.0,
                     }
                 metrics["scaling_results"].append(result_entry)
 
                 print(
                     f"  {obs_count} obs: avg_surprise={result_entry['avg_surprise']:.3f}, "
-                    f"p99_latency={result_entry['p99_latency_ms']:.1f}ms"
+                    f"p99_latency={result_entry['p99_latency_ms']:.1f}ms, "
+                    f"mem={result_entry['memory_size_mb']:.2f}MB"
                 )
 
             # Check expectations
@@ -703,24 +714,47 @@ class ExperimentRunner:
                 self.memory = NeuralMemory(config)
 
                 surprises = []
+                observed_patterns = []
                 for i in range(obs_per_test):
                     domain = domains[i % len(domains)]
                     pred = predicates[i % len(predicates)]
                     obj = objects[i % len(objects)]
                     content = f"DimTest {i}: {domain} {pred} {obj}"
+                    observed_patterns.append(content)
 
                     result = self.memory.observe(content)
                     surprises.append(result["surprise"])
 
                 avg_surprise = sum(surprises) / len(surprises) if surprises else 0
+
+                # Calculate unique_patterns_retained by testing recall
+                # A pattern is "retained" if its surprise is below a threshold
+                retained_count = 0
+                recall_threshold = 0.3  # Patterns with surprise < 0.3 are "remembered"
+                sample_size = min(50, len(observed_patterns))  # Sample for efficiency
+                assert self.memory is not None  # Set above
+                for i in range(
+                    0, len(observed_patterns), max(1, len(observed_patterns) // sample_size)
+                ):
+                    surprise_value = self.memory.surprise(observed_patterns[i])
+                    if surprise_value < recall_threshold:
+                        retained_count += 1
+                # Extrapolate to full count
+                unique_patterns_retained = int(
+                    retained_count * (len(observed_patterns) / sample_size)
+                )
+
                 dim_result = {
                     "dimension": dim,
                     "avg_surprise": avg_surprise,
                     "final_surprise": surprises[-1] if surprises else 0,
+                    "unique_patterns_retained": unique_patterns_retained,
                 }
                 metrics["dimension_results"].append(dim_result)
 
-                print(f"  dim={dim}: avg_surprise={avg_surprise:.3f}")
+                print(
+                    f"  dim={dim}: avg_surprise={avg_surprise:.3f}, patterns_retained={unique_patterns_retained}"
+                )
 
             if trace:
                 self._log_score(trace, "passed", 1.0 if passed else 0.0)
