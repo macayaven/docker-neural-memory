@@ -7,13 +7,14 @@ Tracks both training evolution and inference-time traces.
 from __future__ import annotations
 
 import time
-from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from langfuse import Langfuse
     from langfuse.client import StatefulSpanClient, StatefulTraceClient
 
