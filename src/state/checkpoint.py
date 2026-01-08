@@ -47,14 +47,14 @@ class CheckpointManager:
     def _load_metadata(self) -> None:
         """Load checkpoint metadata from disk."""
         if self.metadata_file.exists():
-            with open(self.metadata_file) as f:
+            with self.metadata_file.open() as f:
                 self.metadata = json.load(f)
         else:
             self.metadata = {"checkpoints": {}}
 
     def _save_metadata(self) -> None:
         """Save checkpoint metadata to disk."""
-        with open(self.metadata_file, "w") as f:
+        with self.metadata_file.open("w") as f:
             json.dump(self.metadata, f, indent=2)
 
     def _compute_hash(self, model: nn.Module) -> str:

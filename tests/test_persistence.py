@@ -4,7 +4,6 @@ Tests for state persistence - verifying learned state survives restart.
 
 import tempfile
 
-import pytest
 import torch
 
 from src.memory.neural_memory import NeuralMemory
@@ -38,8 +37,8 @@ class TestCheckpointPersistence:
             for _ in range(10):
                 memory.observe(torch.randn(1, 10, 64))
 
-            # Surprise should be different now
-            surprise_after_more_learning = memory.get_surprise(pattern)
+            # Surprise should be different now (continue learning)
+            memory.get_surprise(pattern)
 
             # Restore
             manager.restore(memory, "test-v1")

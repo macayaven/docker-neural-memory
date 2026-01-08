@@ -4,11 +4,10 @@ Tests to verify that the neural memory actually learns.
 Key validation: surprise should decrease on repeated patterns.
 """
 
-import pytest
 import torch
 
 from src.memory.neural_memory import NeuralMemory
-from src.memory.ttt_layer import TTTLayer, TTTLinear, TTTMLP
+from src.memory.ttt_layer import TTTMLP, TTTLayer, TTTLinear
 
 
 class TestNeuralMemoryLearning:
@@ -46,7 +45,7 @@ class TestNeuralMemoryLearning:
 
         # Check weights changed
         weight_changed = False
-        for p, init in zip(memory.memory_net.parameters(), initial_weights):
+        for p, init in zip(memory.memory_net.parameters(), initial_weights, strict=True):
             if not torch.allclose(p, init):
                 weight_changed = True
                 break
@@ -66,7 +65,7 @@ class TestNeuralMemoryLearning:
         memory.infer(pattern)
 
         # Check weights unchanged
-        for p, init in zip(memory.memory_net.parameters(), initial_weights):
+        for p, init in zip(memory.memory_net.parameters(), initial_weights, strict=True):
             assert torch.allclose(p, init), "Weights should not change during infer"
 
     def test_different_patterns_have_different_surprise(self):

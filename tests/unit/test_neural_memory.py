@@ -1,7 +1,5 @@
 """Unit tests for NeuralMemory module."""
 
-import pytest
-
 from src.config import MemoryConfig
 from src.memory.neural_memory import NeuralMemory
 

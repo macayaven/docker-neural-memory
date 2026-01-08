@@ -41,7 +41,7 @@ class VersionManager:
         """
         self.checkpoint_mgr = checkpoint_manager
 
-    def fork(self, model: nn.Module, source_tag: str, new_tag: str) -> ForkInfo:
+    def fork(self, _model: nn.Module, source_tag: str, new_tag: str) -> ForkInfo:
         """
         Fork memory state into a new branch.
 
@@ -110,7 +110,7 @@ class VersionManager:
         return lineage
 
     def diff_checkpoints(
-        self, model_class: type, tag1: str, tag2: str
+        self, _model_class: type, tag1: str, tag2: str
     ) -> dict[str, float]:
         """
         Compare two checkpoints and return weight differences.

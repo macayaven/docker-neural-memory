@@ -7,10 +7,11 @@ Tracks both training evolution and inference-time traces.
 from __future__ import annotations
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Generator
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from langfuse import Langfuse
@@ -85,7 +86,7 @@ class MemoryObserver:
         """
         self.memory = memory
         self.langfuse = langfuse
-        self.session_id = session_id or f"session_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        self.session_id = session_id or f"session_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
 
         # Local metrics storage
         self._observations: list[MetricsSnapshot] = []
@@ -94,7 +95,7 @@ class MemoryObserver:
 
     def _get_timestamp(self) -> str:
         """Get ISO timestamp."""
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     @contextmanager
     def _trace(self, name: str, **metadata: Any) -> Generator[StatefulSpanClient | None, None, None]:

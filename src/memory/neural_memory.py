@@ -10,11 +10,10 @@ Based on: https://arxiv.org/abs/2501.00663
 from __future__ import annotations
 
 import hashlib
-from typing import Union
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as functional
 from torch import Tensor
 
 from ..config import MemoryConfig
@@ -34,7 +33,7 @@ class NeuralMemory(nn.Module):
         >>> print(f"Surprise: {result['surprise']:.3f}")
     """
 
-    def __init__(self, config: Union[MemoryConfig, int] = None, **kwargs):
+    def __init__(self, config: MemoryConfig | int | None = None, **kwargs):
         super().__init__()
 
         # Handle both config object and legacy positional args
@@ -146,7 +145,7 @@ class NeuralMemory(nn.Module):
         target = self.target_proj(x[:, 1:, :])
         prediction = pred[:, :-1, :]
 
-        return F.mse_loss(prediction, target)
+        return functional.mse_loss(prediction, target)
 
     def _compute_surprise(self, x: Tensor, pred: Tensor) -> float:
         """
@@ -158,7 +157,7 @@ class NeuralMemory(nn.Module):
 
             target = self.target_proj(x[:, 1:, :])
             prediction = pred[:, :-1, :]
-            mse = F.mse_loss(prediction, target).item()
+            mse = functional.mse_loss(prediction, target).item()
 
             # Convert to 0-1 range using sigmoid-like scaling
             surprise = 2.0 / (1.0 + torch.exp(torch.tensor(-mse * 10)).item()) - 1.0
@@ -175,14 +174,14 @@ class NeuralMemory(nn.Module):
             )
 
             with torch.no_grad():
-                for param, grad in zip(self.memory_net.parameters(), grads):
+                for param, grad in zip(self.memory_net.parameters(), grads, strict=True):
                     if grad is not None:
                         param -= self.lr * grad
         except RuntimeError:
             # Gradient computation failed, skip update
             pass
 
-    def observe(self, content: Union[str, Tensor], learning_rate: float = None) -> dict:
+    def observe(self, content: str | Tensor, learning_rate: float | None = None) -> dict:
         """
         Feed content to memory, triggering test-time learning.
 
@@ -200,10 +199,7 @@ class NeuralMemory(nn.Module):
             self.lr.data = torch.tensor(learning_rate, device=self.config.device)
 
         # Encode if string
-        if isinstance(content, str):
-            x = self._encode_text(content)
-        else:
-            x = content
+        x = self._encode_text(content) if isinstance(content, str) else content
 
         # Store initial weights for delta calculation
         initial_weights = {
@@ -238,7 +234,7 @@ class NeuralMemory(nn.Module):
             "learned": weight_delta > 1e-6,
         }
 
-    def infer(self, query: Union[str, Tensor], temperature: float = 1.0) -> dict:
+    def infer(self, query: str | Tensor, _temperature: float = 1.0) -> dict:
         """
         Query memory using learned representations (no learning).
 
@@ -249,10 +245,7 @@ class NeuralMemory(nn.Module):
         Returns:
             dict with response tensor and confidence
         """
-        if isinstance(query, str):
-            x = self._encode_text(query)
-        else:
-            x = query
+        x = self._encode_text(query) if isinstance(query, str) else query
 
         with torch.no_grad():
             output = self.forward(x, learn=False)
@@ -264,7 +257,7 @@ class NeuralMemory(nn.Module):
             "attention_weights": output[0, 0, :10].tolist() if output.dim() >= 3 else [],
         }
 
-    def surprise(self, content: Union[str, Tensor]) -> float:
+    def surprise(self, content: str | Tensor) -> float:
         """
         Measure how surprising/novel content is WITHOUT learning.
 
@@ -274,10 +267,7 @@ class NeuralMemory(nn.Module):
         Returns:
             Surprise score between 0 (familiar) and 1 (novel)
         """
-        if isinstance(content, str):
-            x = self._encode_text(content)
-        else:
-            x = content
+        x = self._encode_text(content) if isinstance(content, str) else content
 
         with torch.no_grad():
             output = self.memory_net(x)

@@ -159,14 +159,13 @@ class NeuralMemoryServer:
             "recommendation": recommendation,
         }
 
-    async def _handle_consolidate(self, args: dict[str, Any]) -> dict:
+    async def _handle_consolidate(self, _args: dict[str, Any]) -> dict:
         """Handle consolidate tool call."""
         # Use recent observations for consolidation
         # In production, would store actual observation tensors
-        result = self.consolidator.consolidate(
+        return self.consolidator.consolidate(
             self.memory.memory_net, [self._text_to_tensor("placeholder")]
         )
-        return result
 
     async def _handle_checkpoint(self, args: dict[str, Any]) -> dict:
         """Handle checkpoint tool call."""
@@ -208,7 +207,7 @@ class NeuralMemoryServer:
             "new_hash": info.new_hash,
         }
 
-    async def _handle_list_checkpoints(self, args: dict[str, Any]) -> dict:
+    async def _handle_list_checkpoints(self, _args: dict[str, Any]) -> dict:
         """Handle list_checkpoints tool call."""
         checkpoints = self.checkpoint_mgr.list_checkpoints()
 
@@ -224,7 +223,7 @@ class NeuralMemoryServer:
             ]
         }
 
-    async def _handle_stats(self, args: dict[str, Any]) -> dict:
+    async def _handle_stats(self, _args: dict[str, Any]) -> dict:
         """Handle stats tool call."""
         weight_params = sum(p.numel() for p in self.memory.parameters())
         avg_surprise = (
@@ -271,7 +270,7 @@ class NeuralMemoryServer:
             if "weight" in name:
                 # Find strongest connections
                 values, indices = param.abs().flatten().topk(min(top_k, param.numel()))
-                for val, idx in zip(values, indices):
+                for val, idx in zip(values, indices, strict=True):
                     patterns.append(
                         {
                             "description": f"Weight {name}[{idx.item()}]",
