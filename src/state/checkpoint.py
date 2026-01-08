@@ -61,7 +61,9 @@ class CheckpointManager:
         """Compute hash of model weights for integrity verification."""
         hasher = hashlib.sha256()
         for param in model.parameters():
-            hasher.update(param.data.cpu().numpy().tobytes())
+            # Use string representation instead of numpy to avoid numpy dependency
+            data_str = str(param.data.cpu().flatten().tolist())
+            hasher.update(data_str.encode())
         return hasher.hexdigest()[:16]
 
     def checkpoint(self, model: nn.Module, tag: str, description: str = "") -> CheckpointInfo:

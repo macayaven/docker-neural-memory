@@ -77,8 +77,8 @@ class TestNeuralMemoryLearning:
             memory.observe(pattern1)
 
         # Check surprise for learned vs new pattern
-        surprise_learned = memory.get_surprise(pattern1)
-        surprise_new = memory.get_surprise(torch.randn(1, 10, 64))
+        surprise_learned = memory.surprise(pattern1)
+        surprise_new = memory.surprise(torch.randn(1, 10, 64))
 
         assert surprise_new > surprise_learned, (
             f"New pattern should be more surprising: "

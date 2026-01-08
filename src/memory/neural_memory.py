@@ -281,7 +281,9 @@ class NeuralMemory(nn.Module):
         with torch.no_grad():
             state = self.memory_net.state_dict()
             flat = torch.cat([v.flatten().cpu() for v in state.values()])
-            hash_bytes = hashlib.sha256(flat.numpy().tobytes()).digest()
+            # Use string representation instead of numpy to avoid numpy dependency
+            data_str = str(flat.tolist())
+            hash_bytes = hashlib.sha256(data_str.encode()).digest()
             return hash_bytes[:8].hex()
 
     def get_stats(self) -> dict[str, Any]:
