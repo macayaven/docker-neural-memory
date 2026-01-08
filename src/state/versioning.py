@@ -6,7 +6,6 @@ Enables experimentation without losing stable state.
 
 import shutil
 from dataclasses import dataclass
-from pathlib import Path
 
 import torch
 import torch.nn as nn
