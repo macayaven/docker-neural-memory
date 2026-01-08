@@ -99,7 +99,9 @@ class MemoryObserver:
         return datetime.now(UTC).isoformat()
 
     @contextmanager
-    def _trace(self, name: str, **metadata: Any) -> Generator[StatefulSpanClient | None, None, None]:
+    def _trace(
+        self, name: str, **metadata: Any
+    ) -> Generator[StatefulSpanClient | None, None, None]:
         """Context manager for Langfuse tracing."""
         if self.langfuse is None:
             yield None
@@ -296,7 +298,9 @@ class MemoryObserver:
             "inference": {
                 "total_queries": len(self._inferences),
                 "avg_latency_ms": safe_avg(inf_latencies),
-                "p99_latency_ms": sorted(inf_latencies)[int(len(inf_latencies) * 0.99)] if inf_latencies else 0,
+                "p99_latency_ms": sorted(inf_latencies)[int(len(inf_latencies) * 0.99)]
+                if inf_latencies
+                else 0,
             },
             "memory": self.memory.get_stats(),
         }

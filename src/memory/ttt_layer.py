@@ -34,6 +34,7 @@ class TTTLayer(nn.Module):
         super().__init__()
         self.dim = dim
         self.variant = variant
+        self.hidden_model: nn.Module
 
         if variant == "linear":
             # TTT-Linear: Hidden state is a linear model
@@ -85,9 +86,7 @@ class TTTLayer(nn.Module):
             loss = functional.mse_loss(y_t, v)
 
             # Compute gradients
-            grads = torch.autograd.grad(
-                loss, hidden_state.parameters(), create_graph=False
-            )
+            grads = torch.autograd.grad(loss, list(hidden_state.parameters()), create_graph=False)
 
             # Update hidden state weights
             with torch.no_grad():

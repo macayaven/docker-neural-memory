@@ -64,9 +64,7 @@ class CheckpointManager:
             hasher.update(param.data.cpu().numpy().tobytes())
         return hasher.hexdigest()[:16]
 
-    def checkpoint(
-        self, model: nn.Module, tag: str, description: str = ""
-    ) -> CheckpointInfo:
+    def checkpoint(self, model: nn.Module, tag: str, description: str = "") -> CheckpointInfo:
         """
         Save current learned state as a named checkpoint.
 

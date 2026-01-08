@@ -28,8 +28,7 @@ class TestNeuralMemoryLearning:
 
         # Surprise should generally decrease (allowing some noise)
         assert surprises[-1] < surprises[0], (
-            f"Surprise should decrease: first={surprises[0]:.4f}, "
-            f"last={surprises[-1]:.4f}"
+            f"Surprise should decrease: first={surprises[0]:.4f}, last={surprises[-1]:.4f}"
         )
 
     def test_weights_update_during_observation(self):

@@ -29,7 +29,7 @@ class NeuralMemoryServer:
     Handles all tool calls and manages the neural memory lifecycle.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Configuration from environment
         self.memory_dim = int(os.environ.get("MEMORY_DIM", "512"))
         self.ttt_variant = os.environ.get("TTT_VARIANT", "mlp")
@@ -88,7 +88,7 @@ class NeuralMemoryServer:
 
         return await handler(arguments)
 
-    async def _handle_observe(self, args: dict[str, Any]) -> dict:
+    async def _handle_observe(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle observe tool call."""
         context = args["context"]
         domain = args.get("domain")
@@ -121,29 +121,29 @@ class NeuralMemoryServer:
             "patterns_activated": [],  # TODO: implement pattern detection
         }
 
-    async def _handle_infer(self, args: dict[str, Any]) -> dict:
+    async def _handle_infer(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle infer tool call."""
         prompt = args["prompt"]
 
         tensor = self._text_to_tensor(prompt)
-        output = self.memory.infer(tensor)
+        result = self.memory.infer(tensor)
 
         # Convert output back to interpretable form
         # In production, use a proper decoder
-        confidence = 1.0 - self.memory.get_surprise(tensor)
+        confidence = 1.0 - self.memory.surprise(tensor)
 
         return {
             "response": f"[Neural memory inference for: {prompt[:50]}...]",
             "confidence": max(0.0, min(1.0, confidence)),
-            "attention_weights": output[0, 0, :10].tolist(),
+            "attention_weights": result["attention_weights"],
         }
 
-    async def _handle_surprise(self, args: dict[str, Any]) -> dict:
+    async def _handle_surprise(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle surprise tool call."""
         input_text = args["input"]
 
         tensor = self._text_to_tensor(input_text)
-        surprise = self.memory.get_surprise(tensor)
+        surprise = self.memory.surprise(tensor)
 
         # Determine recommendation based on surprise level
         if surprise > 0.7:
@@ -159,7 +159,7 @@ class NeuralMemoryServer:
             "recommendation": recommendation,
         }
 
-    async def _handle_consolidate(self, _args: dict[str, Any]) -> dict:
+    async def _handle_consolidate(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle consolidate tool call."""
         # Use recent observations for consolidation
         # In production, would store actual observation tensors
@@ -167,7 +167,7 @@ class NeuralMemoryServer:
             self.memory.memory_net, [self._text_to_tensor("placeholder")]
         )
 
-    async def _handle_checkpoint(self, args: dict[str, Any]) -> dict:
+    async def _handle_checkpoint(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle checkpoint tool call."""
         tag = args["tag"]
         description = args.get("description", "")
@@ -181,7 +181,7 @@ class NeuralMemoryServer:
             "weight_hash": info.weight_hash,
         }
 
-    async def _handle_restore(self, args: dict[str, Any]) -> dict:
+    async def _handle_restore(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle restore tool call."""
         tag = args["tag"]
 
@@ -194,7 +194,7 @@ class NeuralMemoryServer:
             "learning_since_checkpoint": learning.get("total_learning", 0),
         }
 
-    async def _handle_fork(self, args: dict[str, Any]) -> dict:
+    async def _handle_fork(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle fork tool call."""
         source_tag = args["source_tag"]
         new_tag = args["new_tag"]
@@ -207,7 +207,7 @@ class NeuralMemoryServer:
             "new_hash": info.new_hash,
         }
 
-    async def _handle_list_checkpoints(self, _args: dict[str, Any]) -> dict:
+    async def _handle_list_checkpoints(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle list_checkpoints tool call."""
         checkpoints = self.checkpoint_mgr.list_checkpoints()
 
@@ -223,7 +223,7 @@ class NeuralMemoryServer:
             ]
         }
 
-    async def _handle_stats(self, _args: dict[str, Any]) -> dict:
+    async def _handle_stats(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle stats tool call."""
         weight_params = sum(p.numel() for p in self.memory.parameters())
         avg_surprise = (
@@ -240,25 +240,25 @@ class NeuralMemoryServer:
             "domains": list(self.domains),
         }
 
-    async def _handle_attention_map(self, args: dict[str, Any]) -> dict:
+    async def _handle_attention_map(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle attention_map tool call."""
         query = args["query"]
 
         tensor = self._text_to_tensor(query)
-        output = self.memory.infer(tensor)
+        result = self.memory.infer(tensor)
 
-        # Extract attention-like weights from output
-        weights = output[0, 0, :].softmax(dim=0)
+        # Extract attention-like weights from output tensor
+        response_tensor = result["response"]
+        weights = response_tensor[0, 0, :].softmax(dim=0)
 
         return {
             "attention_weights": [
-                {"pattern": f"pattern_{i}", "weight": w.item()}
-                for i, w in enumerate(weights[:10])
+                {"pattern": f"pattern_{i}", "weight": w.item()} for i, w in enumerate(weights[:10])
             ],
             "visualization_url": None,
         }
 
-    async def _handle_explain(self, args: dict[str, Any]) -> dict:
+    async def _handle_explain(self, args: dict[str, Any]) -> dict[str, Any]:
         """Handle explain tool call."""
         top_k = args.get("top_k", 10)
 
@@ -284,12 +284,12 @@ class NeuralMemoryServer:
 
         return {"patterns": patterns[:top_k]}
 
-    def get_tool_schemas(self) -> list[dict]:
+    def get_tool_schemas(self) -> list[dict[str, Any]]:
         """Get all tool schemas for MCP registration."""
         return list(TOOL_SCHEMAS.values())
 
 
-async def main():
+async def main() -> None:
     """Run the MCP server."""
     server = NeuralMemoryServer()
 
@@ -303,6 +303,7 @@ async def main():
             line = await asyncio.get_event_loop().run_in_executor(None, input)
             request = json.loads(line)
 
+            response: dict[str, Any] = {}
             if request.get("method") == "tools/list":
                 response = {"tools": server.get_tool_schemas()}
             elif request.get("method") == "tools/call":

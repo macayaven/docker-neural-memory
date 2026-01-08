@@ -17,7 +17,7 @@ import json
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +30,7 @@ from src.memory.neural_memory import NeuralMemory
 # Optional Langfuse import
 try:
     from langfuse import Langfuse
+
     LANGFUSE_AVAILABLE = True
 except ImportError:
     LANGFUSE_AVAILABLE = False
@@ -39,6 +40,7 @@ except ImportError:
 @dataclass
 class ExperimentConfig:
     """Configuration for an experiment run."""
+
     suite: str = "all"
     dim: int = 256
     learning_rate: float = 0.01
@@ -49,13 +51,14 @@ class ExperimentConfig:
 
     def __post_init__(self) -> None:
         if not self.experiment_name:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             self.experiment_name = f"exp_{self.suite}_{timestamp}"
 
 
 @dataclass
 class ExperimentResult:
     """Result of a single test."""
+
     test_id: str
     passed: bool
     metrics: dict[str, Any]
@@ -108,7 +111,7 @@ class ExperimentRunner:
     def run_learning_suite(self) -> list[ExperimentResult]:
         """Run learning verification tests."""
         dataset_path = Path("experiments/datasets/learning.json")
-        with open(dataset_path) as f:
+        with dataset_path.open() as f:
             dataset = json.load(f)
 
         results = []
@@ -150,17 +153,20 @@ class ExperimentRunner:
                 # Check expected outcomes
                 expected = test.get("expected", {})
 
-                if "surprise_trend" in expected:
-                    if expected["surprise_trend"] == "decreasing":
-                        # Check if trend is generally decreasing
-                        first_half_avg = sum(metrics["surprises"][:len(metrics["surprises"])//2]) / max(1, len(metrics["surprises"])//2)
-                        second_half_avg = sum(metrics["surprises"][len(metrics["surprises"])//2:]) / max(1, len(metrics["surprises"]) - len(metrics["surprises"])//2)
-                        passed = passed and (second_half_avg < first_half_avg)
-                        metrics["trend_check"] = {
-                            "first_half_avg": first_half_avg,
-                            "second_half_avg": second_half_avg,
-                            "is_decreasing": second_half_avg < first_half_avg,
-                        }
+                if "surprise_trend" in expected and expected["surprise_trend"] == "decreasing":
+                    # Check if trend is generally decreasing
+                    first_half_avg = sum(
+                        metrics["surprises"][: len(metrics["surprises"]) // 2]
+                    ) / max(1, len(metrics["surprises"]) // 2)
+                    second_half_avg = sum(
+                        metrics["surprises"][len(metrics["surprises"]) // 2 :]
+                    ) / max(1, len(metrics["surprises"]) - len(metrics["surprises"]) // 2)
+                    passed = passed and (second_half_avg < first_half_avg)
+                    metrics["trend_check"] = {
+                        "first_half_avg": first_half_avg,
+                        "second_half_avg": second_half_avg,
+                        "is_decreasing": second_half_avg < first_half_avg,
+                    }
 
                 if "final_surprise_max" in expected:
                     final = metrics["surprises"][-1]
@@ -189,8 +195,11 @@ class ExperimentRunner:
                 self._log_score(trace, "passed", 1.0 if passed else 0.0)
                 if metrics["surprises"]:
                     self._log_score(trace, "final_surprise", metrics["surprises"][-1])
-                    self._log_score(trace, "surprise_reduction",
-                                  metrics["surprises"][0] - metrics["surprises"][-1])
+                    self._log_score(
+                        trace,
+                        "surprise_reduction",
+                        metrics["surprises"][0] - metrics["surprises"][-1],
+                    )
 
         except Exception as e:
             passed = False
@@ -209,7 +218,7 @@ class ExperimentRunner:
     def run_retention_suite(self) -> list[ExperimentResult]:
         """Run retention verification tests."""
         dataset_path = Path("experiments/datasets/retention.json")
-        with open(dataset_path) as f:
+        with dataset_path.open() as f:
             dataset = json.load(f)
 
         results = []
@@ -268,9 +277,7 @@ class ExperimentRunner:
                             # Measure recall performance after consolidation
                             pre_recall = metrics.get("recall_surprises", [])
                             if pre_recall:
-                                metrics["pre_consolidation_avg"] = sum(pre_recall) / len(
-                                    pre_recall
-                                )
+                                metrics["pre_consolidation_avg"] = sum(pre_recall) / len(pre_recall)
 
             if trace:
                 self._log_score(trace, "passed", 1.0 if passed else 0.0)
@@ -294,7 +301,7 @@ class ExperimentRunner:
     def run_generalization_suite(self) -> list[ExperimentResult]:
         """Run generalization verification tests."""
         dataset_path = Path("experiments/datasets/generalization.json")
-        with open(dataset_path) as f:
+        with dataset_path.open() as f:
             dataset = json.load(f)
 
         results = []
@@ -344,14 +351,10 @@ class ExperimentRunner:
 
                     # Check recognition rate (% with surprise below threshold)
                     if "recognition_rate_min" in expected:
-                        low_surprise_count = sum(
-                            1 for s in paraphrase_surprises if s < 0.5
-                        )
+                        low_surprise_count = sum(1 for s in paraphrase_surprises if s < 0.5)
                         recognition_rate = low_surprise_count / len(paraphrase_surprises)
                         metrics["recognition_rate"] = recognition_rate
-                        passed = passed and (
-                            recognition_rate >= expected["recognition_rate_min"]
-                        )
+                        passed = passed and (recognition_rate >= expected["recognition_rate_min"])
 
             # Test novel related content
             if "test_novel" in test:
@@ -402,9 +405,7 @@ class ExperimentRunner:
 
                     expected = test.get("expected", {})
                     if "unrelated_surprise_min" in expected:
-                        passed = passed and (
-                            avg_unrelated >= expected["unrelated_surprise_min"]
-                        )
+                        passed = passed and (avg_unrelated >= expected["unrelated_surprise_min"])
 
             if trace:
                 self._log_score(trace, "passed", 1.0 if passed else 0.0)
@@ -426,7 +427,7 @@ class ExperimentRunner:
     def run_capacity_suite(self) -> list[ExperimentResult]:
         """Run capacity stress tests."""
         dataset_path = Path("experiments/datasets/capacity.json")
-        with open(dataset_path) as f:
+        with dataset_path.open() as f:
             dataset = json.load(f)
 
         results = []
@@ -502,9 +503,7 @@ class ExperimentRunner:
                         "avg_surprise": sum(surprises) / len(surprises),
                         "final_surprise": surprises[-1],
                         "avg_latency_ms": sum(latencies) / len(latencies),
-                        "p99_latency_ms": sorted(latencies)[
-                            int(len(latencies) * 0.99)
-                        ],
+                        "p99_latency_ms": sorted(latencies)[int(len(latencies) * 0.99)],
                     }
                 else:
                     result_entry = {
@@ -516,8 +515,10 @@ class ExperimentRunner:
                     }
                 metrics["scaling_results"].append(result_entry)
 
-                print(f"  {obs_count} obs: avg_surprise={result_entry['avg_surprise']:.3f}, "
-                      f"p99_latency={result_entry['p99_latency_ms']:.1f}ms")
+                print(
+                    f"  {obs_count} obs: avg_surprise={result_entry['avg_surprise']:.3f}, "
+                    f"p99_latency={result_entry['p99_latency_ms']:.1f}ms"
+                )
 
             # Check expectations
             expected = test.get("expected", {})
@@ -602,7 +603,7 @@ class ExperimentRunner:
             error=error,
         )
 
-    def _run_recovery_test(self, test: dict, generators: dict) -> ExperimentResult:
+    def _run_recovery_test(self, test: dict, _generators: dict) -> ExperimentResult:
         """Run recovery after consolidation test."""
         test_id = test["id"]
         trace = self._create_trace(f"capacity/{test_id}", {"test": test})
@@ -636,9 +637,7 @@ class ExperimentRunner:
             error=error,
         )
 
-    def _run_dimension_capacity_test(
-        self, test: dict, generators: dict
-    ) -> ExperimentResult:
+    def _run_dimension_capacity_test(self, test: dict, generators: dict) -> ExperimentResult:
         """Run dimension vs capacity test."""
         test_id = test["id"]
         trace = self._create_trace(f"capacity/{test_id}", {"test": test})
@@ -721,15 +720,12 @@ class ExperimentRunner:
             "capacity": self.run_capacity_suite,
         }
 
-        if self.config.suite == "all":
-            to_run = list(suites.keys())
-        else:
-            to_run = [self.config.suite]
+        to_run = list(suites.keys()) if self.config.suite == "all" else [self.config.suite]
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Experiment: {self.config.experiment_name}")
         print(f"Config: dim={self.config.dim}, lr={self.config.learning_rate}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         for suite_name in to_run:
             if suite_name in suites:
@@ -741,9 +737,9 @@ class ExperimentRunner:
         total = sum(len(r) for r in all_results.values())
         passed = sum(sum(1 for r in results if r.passed) for results in all_results.values())
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"SUMMARY: {passed}/{total} tests passed")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Save results
         self._save_results(all_results)
@@ -757,8 +753,10 @@ class ExperimentRunner:
             "total_tests": total,
             "passed": passed,
             "suites": {
-                name: [{"test_id": r.test_id, "passed": r.passed, "metrics": r.metrics}
-                       for r in results]
+                name: [
+                    {"test_id": r.test_id, "passed": r.passed, "metrics": r.metrics}
+                    for r in results
+                ]
                 for name, results in all_results.items()
             },
         }
@@ -776,7 +774,7 @@ class ExperimentRunner:
                 "learning_rate": self.config.learning_rate,
                 "device": self.config.device,
             },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "suites": {
                 name: [
                     {
@@ -792,7 +790,7 @@ class ExperimentRunner:
             },
         }
 
-        with open(output_file, "w") as f:
+        with output_file.open("w") as f:
             json.dump(data, f, indent=2)
 
         print(f"Results saved to: {output_file}")
@@ -800,14 +798,21 @@ class ExperimentRunner:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run neural memory experiments")
-    parser.add_argument("--suite", default="all",
-                       choices=["all", "learning", "retention", "generalization", "capacity"],
-                       help="Which test suite to run")
+    parser.add_argument(
+        "--suite",
+        default="all",
+        choices=["all", "learning", "retention", "generalization", "capacity"],
+        help="Which test suite to run",
+    )
     parser.add_argument("--dim", type=int, default=256, help="Memory dimension")
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--device", default="cpu", help="Device (cpu, cuda, mps)")
-    parser.add_argument("--output", type=Path, default=Path("experiments/results"),
-                       help="Output directory for results")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("experiments/results"),
+        help="Output directory for results",
+    )
     parser.add_argument("--no-langfuse", action="store_true", help="Disable Langfuse tracking")
     parser.add_argument("--name", default="", help="Experiment name (auto-generated if empty)")
 
