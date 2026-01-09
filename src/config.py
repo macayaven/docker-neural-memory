@@ -70,31 +70,6 @@ class TTTConfig(BaseSettings):
         env_prefix = "TTT_"
 
 
-class CheckpointConfig(BaseSettings):
-    """Configuration for checkpoint management."""
-
-    checkpoint_dir: str = Field(
-        default="/app/checkpoints",
-        description="Directory for checkpoint storage",
-    )
-    weights_dir: str = Field(
-        default="/app/weights",
-        description="Directory for weight storage",
-    )
-    auto_checkpoint: bool = Field(
-        default=True,
-        description="Auto-checkpoint on shutdown",
-    )
-    max_checkpoints: int = Field(
-        default=100,
-        description="Maximum number of checkpoints to keep",
-        ge=1,
-    )
-
-    class Config:
-        env_prefix = "CHECKPOINT_"
-
-
 class MCPConfig(BaseSettings):
     """Configuration for MCP server."""
 
@@ -122,7 +97,6 @@ class AppConfig(BaseSettings):
 
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     ttt: TTTConfig = Field(default_factory=TTTConfig)
-    checkpoint: CheckpointConfig = Field(default_factory=CheckpointConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
 
     debug: bool = Field(

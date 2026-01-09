@@ -58,6 +58,15 @@ ruff format src/ tests/
 mypy src/
 ```
 
+## CI/CD
+
+GitHub Actions runs on every push and PR to `main`:
+
+1. **Lint & Format** - Ruff checks and formatting
+2. **Type Check** - MyPy strict mode
+3. **Test** - Pytest with coverage
+4. **Deploy** - Auto-deploy to HuggingFace Spaces on merge to `main`
+
 ## License
 
 MIT
