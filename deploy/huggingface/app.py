@@ -26,6 +26,360 @@ from sklearn.manifold import TSNE
 matplotlib.use("Agg")
 
 # =============================================================================
+# CUSTOM CSS FOR POLISHED UI
+# =============================================================================
+
+CUSTOM_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --neural-cyan: #00d4ff;
+    --neural-cyan-glow: rgba(0, 212, 255, 0.3);
+    --rag-orange: #ff8c42;
+    --purple-accent: #a855f7;
+    --bg-deep: #0a0a1a;
+    --bg-card: #12122a;
+    --bg-card-hover: #1a1a3a;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-subtle: rgba(148, 163, 184, 0.1);
+    --success-green: #22c55e;
+}
+
+/* Global font settings */
+.gradio-container {
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif !important;
+    background: linear-gradient(180deg, var(--bg-deep) 0%, #0f0f23 100%) !important;
+}
+
+/* Headings */
+.gradio-container h1, .gradio-container h2, .gradio-container h3, .gradio-container h4 {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Code and monospace */
+.gradio-container code, .gradio-container pre {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Tab styling */
+.tabs > .tab-nav > button {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 500 !important;
+    padding: 12px 24px !important;
+    border-radius: 8px 8px 0 0 !important;
+    transition: all 0.3s ease !important;
+}
+
+.tabs > .tab-nav > button.selected {
+    background: linear-gradient(135deg, var(--neural-cyan) 0%, var(--purple-accent) 100%) !important;
+    color: white !important;
+}
+
+/* Button styling */
+.gr-button {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+.gr-button-primary {
+    background: linear-gradient(135deg, var(--neural-cyan) 0%, var(--purple-accent) 100%) !important;
+    border: none !important;
+}
+
+.gr-button-primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px var(--neural-cyan-glow) !important;
+}
+
+.gr-button-secondary {
+    background: transparent !important;
+    border: 1px solid var(--text-secondary) !important;
+    color: var(--text-secondary) !important;
+}
+
+.gr-button-secondary:hover {
+    border-color: var(--neural-cyan) !important;
+    color: var(--neural-cyan) !important;
+}
+
+/* FIX: Labels should NOT look like buttons */
+.gr-textbox label, .gr-plot label, .gr-dropdown label, .gr-checkbox label,
+label.svelte-1gfkn6j, .label-wrap, span.svelte-1gfkn6j {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+    color: var(--text-secondary) !important;
+    cursor: default !important;
+}
+
+/* Ensure label containers don't have button styling */
+.gr-form > label, .gr-box > label, div[data-testid="textbox"] > label {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Input styling */
+.gr-textbox textarea, .gr-textbox input {
+    font-family: 'Outfit', sans-serif !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+.gr-textbox textarea:focus, .gr-textbox input:focus {
+    border-color: var(--neural-cyan) !important;
+    box-shadow: 0 0 0 3px var(--neural-cyan-glow) !important;
+}
+
+/* Card/box styling */
+.gr-box, .gr-panel {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 12px !important;
+}
+
+/* Plot styling */
+.gr-plot {
+    background: var(--bg-card) !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+
+/* Markdown styling */
+.prose {
+    color: var(--text-primary) !important;
+}
+
+.prose h3, .prose h4 {
+    color: var(--neural-cyan) !important;
+}
+
+/* Smooth animations */
+* {
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+"""
+
+HEADER_HTML = '''
+<div style="
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0a0a1a 100%);
+    padding: 40px 30px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+">
+    <!-- Gradient glow effect -->
+    <div style="
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle at 30% 30%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+                    radial-gradient(circle at 70% 70%, rgba(168, 85, 247, 0.1) 0%, transparent 50%);
+        pointer-events: none;
+    "></div>
+
+    <div style="position: relative; z-index: 1;">
+        <!-- Logo and title -->
+        <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
+            <div style="
+                font-size: 48px;
+                background: linear-gradient(135deg, #00d4ff 0%, #a855f7 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            ">🧠</div>
+            <div>
+                <h1 style="
+                    font-size: 2.5em;
+                    font-weight: 700;
+                    margin: 0;
+                    background: linear-gradient(135deg, #00d4ff 0%, #a855f7 50%, #00d4ff 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    letter-spacing: -0.02em;
+                ">Docker Neural Memory</h1>
+                <p style="
+                    color: #94a3b8;
+                    margin: 5px 0 0 0;
+                    font-size: 1.1em;
+                    font-weight: 300;
+                ">Real Test-Time Training — Not a Simulation</p>
+            </div>
+        </div>
+
+        <!-- Feature badges -->
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px;">
+            <span style="
+                background: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, rgba(0, 212, 255, 0.1) 100%);
+                border: 1px solid rgba(0, 212, 255, 0.3);
+                color: #00d4ff;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 0.85em;
+                font-weight: 500;
+            ">⚡ PyTorch TTT</span>
+            <span style="
+                background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
+                border: 1px solid rgba(168, 85, 247, 0.3);
+                color: #a855f7;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 0.85em;
+                font-weight: 500;
+            ">🐳 Docker Native</span>
+            <span style="
+                background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+                border: 1px solid rgba(34, 197, 94, 0.3);
+                color: #22c55e;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 0.85em;
+                font-weight: 500;
+            ">🔌 MCP Server</span>
+            <span style="
+                background: linear-gradient(135deg, rgba(255, 140, 66, 0.2) 0%, rgba(255, 140, 66, 0.1) 100%);
+                border: 1px solid rgba(255, 140, 66, 0.3);
+                color: #ff8c42;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 0.85em;
+                font-weight: 500;
+            ">📊 Titans Architecture</span>
+        </div>
+    </div>
+</div>
+'''
+
+FOOTER_HTML = '''
+<div style="
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: linear-gradient(135deg, #0a0a1a 0%, #12122a 100%);
+    padding: 30px;
+    border-radius: 16px;
+    margin-top: 30px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+        <!-- Left side: Built by -->
+        <div>
+            <p style="color: #94a3b8; margin: 0 0 8px 0; font-size: 0.9em;">Built by</p>
+            <p style="color: #f8fafc; margin: 0; font-size: 1.2em; font-weight: 600;">Carlos Crespo Macaya</p>
+            <p style="color: #64748b; margin: 5px 0 0 0; font-size: 0.85em;">AI Engineer — GenAI Systems & Applied MLOps</p>
+        </div>
+
+        <!-- Right side: Social links -->
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="https://github.com/macayaven/docker-neural-memory" target="_blank" style="
+                display: flex; align-items: center; gap: 8px;
+                background: rgba(255,255,255,0.05);
+                padding: 10px 16px;
+                border-radius: 8px;
+                text-decoration: none;
+                color: #f8fafc;
+                font-size: 0.9em;
+                transition: all 0.3s ease;
+                border: 1px solid transparent;
+            " onmouseover="this.style.borderColor='#f8fafc'; this.style.background='rgba(255,255,255,0.1)';"
+               onmouseout="this.style.borderColor='transparent'; this.style.background='rgba(255,255,255,0.05)';">
+                <span style="font-size: 1.2em;">🐙</span> GitHub
+            </a>
+            <a href="https://www.linkedin.com/in/carlos-crespo-macaya/" target="_blank" style="
+                display: flex; align-items: center; gap: 8px;
+                background: rgba(255,255,255,0.05);
+                padding: 10px 16px;
+                border-radius: 8px;
+                text-decoration: none;
+                color: #f8fafc;
+                font-size: 0.9em;
+                transition: all 0.3s ease;
+                border: 1px solid transparent;
+            " onmouseover="this.style.borderColor='#0077b5'; this.style.color='#0077b5';"
+               onmouseout="this.style.borderColor='transparent'; this.style.color='#f8fafc';">
+                <span style="font-size: 1.2em;">💼</span> LinkedIn
+            </a>
+            <a href="https://www.kaggle.com/macayaven" target="_blank" style="
+                display: flex; align-items: center; gap: 8px;
+                background: rgba(255,255,255,0.05);
+                padding: 10px 16px;
+                border-radius: 8px;
+                text-decoration: none;
+                color: #f8fafc;
+                font-size: 0.9em;
+                transition: all 0.3s ease;
+                border: 1px solid transparent;
+            " onmouseover="this.style.borderColor='#20beff'; this.style.color='#20beff';"
+               onmouseout="this.style.borderColor='transparent'; this.style.color='#f8fafc';">
+                <span style="font-size: 1.2em;">📊</span> Kaggle <span style="background: linear-gradient(135deg, #ffd700, #ffb700); color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: 600;">2×🥇</span>
+            </a>
+            <a href="https://huggingface.co/macayaven" target="_blank" style="
+                display: flex; align-items: center; gap: 8px;
+                background: rgba(255,255,255,0.05);
+                padding: 10px 16px;
+                border-radius: 8px;
+                text-decoration: none;
+                color: #f8fafc;
+                font-size: 0.9em;
+                transition: all 0.3s ease;
+                border: 1px solid transparent;
+            " onmouseover="this.style.borderColor='#ff9d00'; this.style.color='#ff9d00';"
+               onmouseout="this.style.borderColor='transparent'; this.style.color='#f8fafc';">
+                <span style="font-size: 1.2em;">🤗</span> HuggingFace
+            </a>
+            <a href="https://scholar.google.com/citations?user=hwvDud0AAAAJ" target="_blank" style="
+                display: flex; align-items: center; gap: 8px;
+                background: rgba(255,255,255,0.05);
+                padding: 10px 16px;
+                border-radius: 8px;
+                text-decoration: none;
+                color: #f8fafc;
+                font-size: 0.9em;
+                transition: all 0.3s ease;
+                border: 1px solid transparent;
+            " onmouseover="this.style.borderColor='#4285f4'; this.style.color='#4285f4';"
+               onmouseout="this.style.borderColor='transparent'; this.style.color='#f8fafc';">
+                <span style="font-size: 1.2em;">🎓</span> Scholar
+            </a>
+            <a href="https://carlos-crespo.com" target="_blank" style="
+                display: flex; align-items: center; gap: 8px;
+                background: rgba(255,255,255,0.05);
+                padding: 10px 16px;
+                border-radius: 8px;
+                text-decoration: none;
+                color: #f8fafc;
+                font-size: 0.9em;
+                transition: all 0.3s ease;
+                border: 1px solid transparent;
+            " onmouseover="this.style.borderColor='#00d4ff'; this.style.color='#00d4ff';"
+               onmouseout="this.style.borderColor='transparent'; this.style.color='#f8fafc';">
+                <span style="font-size: 1.2em;">🌐</span> Website
+            </a>
+        </div>
+    </div>
+
+    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(148, 163, 184, 0.1); text-align: center;">
+        <p style="color: #64748b; margin: 0; font-size: 0.85em;">
+            Docker Neural Memory — Containerized AI memory with real test-time training
+        </p>
+    </div>
+</div>
+'''
+
+# =============================================================================
 # HUGGINGFACE INFERENCE CLIENT
 # =============================================================================
 
@@ -844,6 +1198,309 @@ The weights encode everything learned.
 
 
 # =============================================================================
+# KEY CONCEPTS (New Educational Tab)
+# =============================================================================
+
+KEY_CONCEPTS_HTML = '''
+<div style="font-family: 'Outfit', system-ui, sans-serif; padding: 20px; color: #f8fafc;">
+    <!-- The Problem -->
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; padding: 25px; margin-bottom: 25px; border: 1px solid rgba(252, 129, 129, 0.3);">
+        <h3 style="color: #fc8181; margin: 0 0 20px 0; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5em;">❌</span> The Problem: LLMs Have No Memory
+        </h3>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 280px; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px;">
+                <p style="color: #a0aec0; margin: 0 0 15px 0; font-size: 0.95em;">Every API call to an LLM starts <strong style="color: #fc8181;">fresh</strong>:</p>
+                <div style="background: #0a0a1a; border-radius: 8px; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em;">
+                    <div style="color: #64748b;">// Call 1</div>
+                    <div style="color: #f8fafc;">User: "My name is Carlos"</div>
+                    <div style="color: #22c55e;">AI: "Nice to meet you, Carlos!"</div>
+                    <br/>
+                    <div style="color: #64748b;">// Call 2 (new session)</div>
+                    <div style="color: #f8fafc;">User: "What's my name?"</div>
+                    <div style="color: #fc8181;">AI: "I don't know your name."</div>
+                </div>
+            </div>
+            <div style="flex: 1; min-width: 280px; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px;">
+                <p style="color: #a0aec0; margin: 0 0 15px 0; font-size: 0.95em;">The model's weights are <strong style="color: #fc8181;">frozen</strong> after training:</p>
+                <ul style="color: #a0aec0; margin: 0; padding-left: 20px; line-height: 1.8;">
+                    <li>Can't learn new information</li>
+                    <li>Can't remember past conversations</li>
+                    <li>Can't adapt to user preferences</li>
+                    <li>Knowledge is static (training cutoff)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Two Solutions -->
+    <h3 style="color: #f8fafc; margin: 30px 0 20px 0; text-align: center; font-size: 1.3em;">
+        Two Solutions to Add Memory
+    </h3>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px;">
+        <!-- RAG Solution -->
+        <div style="background: linear-gradient(135deg, rgba(252, 129, 129, 0.1) 0%, rgba(237, 137, 54, 0.1) 100%); border: 2px solid #fc8181; border-radius: 16px; padding: 25px;">
+            <h4 style="color: #fc8181; margin: 0 0 15px 0; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.3em;">📚</span> Solution A: RAG (Retrieval)
+            </h4>
+            <p style="color: #a0aec0; font-size: 0.9em; margin: 0 0 15px 0;">
+                <strong>Store</strong> information externally, <strong>retrieve</strong> relevant pieces when needed.
+            </p>
+            <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <span style="background: #fc8181; color: #1a1a2e; padding: 4px 10px; border-radius: 4px; font-size: 0.8em; font-weight: 600;">HOW</span>
+                </div>
+                <ol style="color: #a0aec0; margin: 0; padding-left: 20px; font-size: 0.9em; line-height: 1.7;">
+                    <li>Convert facts to vectors (embeddings)</li>
+                    <li>Store in vector database</li>
+                    <li>On query, find similar vectors</li>
+                    <li>Pass retrieved docs to LLM</li>
+                </ol>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <span style="background: rgba(252, 129, 129, 0.2); color: #fc8181; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✓ Simple</span>
+                <span style="background: rgba(252, 129, 129, 0.2); color: #fc8181; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✓ Scalable</span>
+                <span style="background: rgba(100, 116, 139, 0.3); color: #94a3b8; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✗ No patterns</span>
+                <span style="background: rgba(100, 116, 139, 0.3); color: #94a3b8; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✗ Grows</span>
+            </div>
+        </div>
+
+        <!-- Neural Memory Solution -->
+        <div style="background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%); border: 2px solid #00d4ff; border-radius: 16px; padding: 25px;">
+            <h4 style="color: #00d4ff; margin: 0 0 15px 0; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.3em;">🧠</span> Solution B: Neural Memory (Learning)
+            </h4>
+            <p style="color: #a0aec0; font-size: 0.9em; margin: 0 0 15px 0;">
+                <strong>Learn</strong> information into neural weights. Memory IS the network.
+            </p>
+            <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <span style="background: #00d4ff; color: #1a1a2e; padding: 4px 10px; border-radius: 4px; font-size: 0.8em; font-weight: 600;">HOW</span>
+                </div>
+                <ol style="color: #a0aec0; margin: 0; padding-left: 20px; font-size: 0.9em; line-height: 1.7;">
+                    <li>Encode fact as tensor</li>
+                    <li>Forward pass through neural net</li>
+                    <li>Compute prediction error (surprise)</li>
+                    <li><strong style="color: #00d4ff;">Update weights</strong> via gradient descent</li>
+                </ol>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <span style="background: rgba(0, 212, 255, 0.2); color: #00d4ff; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✓ Learns patterns</span>
+                <span style="background: rgba(0, 212, 255, 0.2); color: #00d4ff; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✓ Fixed size</span>
+                <span style="background: rgba(0, 212, 255, 0.2); color: #00d4ff; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✓ Can infer</span>
+                <span style="background: rgba(100, 116, 139, 0.3); color: #94a3b8; padding: 5px 12px; border-radius: 6px; font-size: 0.8em;">✗ Complex</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test-Time Training Innovation -->
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; padding: 25px; margin-top: 25px; border: 1px solid rgba(0, 212, 255, 0.3);">
+        <h3 style="color: #00d4ff; margin: 0 0 20px 0; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5em;">⚡</span> The Innovation: Test-Time Training (TTT)
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px;">
+                <h5 style="color: #a855f7; margin: 0 0 10px 0;">Traditional Training</h5>
+                <p style="color: #a0aec0; font-size: 0.9em; margin: 0; line-height: 1.6;">
+                    Train once → Freeze weights → Deploy<br/>
+                    <span style="color: #64748b;">Model can't learn after deployment</span>
+                </p>
+            </div>
+            <div style="background: rgba(0, 212, 255, 0.1); border-radius: 12px; padding: 20px; border: 1px solid rgba(0, 212, 255, 0.2);">
+                <h5 style="color: #00d4ff; margin: 0 0 10px 0;">Test-Time Training (Titans)</h5>
+                <p style="color: #a0aec0; font-size: 0.9em; margin: 0; line-height: 1.6;">
+                    Deploy → <strong style="color: #00d4ff;">Continue learning</strong> → Weights update<br/>
+                    <span style="color: #22c55e;">Model learns from every interaction</span>
+                </p>
+            </div>
+        </div>
+        <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 10px;">
+            <p style="color: #a0aec0; margin: 0; font-size: 0.9em;">
+                <strong style="color: #f8fafc;">This demo implements real TTT:</strong> When you add a fact, actual PyTorch gradients flow and actual neural network weights change. This is not a simulation—it's the Titans architecture from Google's December 2024 paper.
+            </p>
+        </div>
+    </div>
+</div>
+'''
+
+# =============================================================================
+# INCREMENTAL INTEGRATION DIAGRAMS
+# =============================================================================
+
+VANILLA_LLM_DIAGRAM_HTML = '''
+<div style="font-family: 'Outfit', system-ui, sans-serif; padding: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; color: #fff; margin-bottom: 20px; border: 1px solid rgba(148, 163, 184, 0.2);">
+    <h4 style="color: #94a3b8; margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px;">
+        <span style="background: #374151; color: #f8fafc; padding: 4px 12px; border-radius: 6px; font-size: 0.8em;">Step 1</span>
+        Vanilla LLM (The Problem)
+    </h4>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap;">
+        <div style="background: #2d3748; padding: 20px 30px; border-radius: 12px; text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 10px;">👤</div>
+            <div style="color: #f8fafc; font-weight: 500;">User Query</div>
+            <div style="color: #64748b; font-size: 0.85em;">"What's my preference?"</div>
+        </div>
+        <div style="color: #64748b; font-size: 32px;">→</div>
+        <div style="background: linear-gradient(135deg, #805ad5 0%, #553c9a 100%); padding: 20px 30px; border-radius: 12px; text-align: center; border: 2px solid #d6bcfa;">
+            <div style="font-size: 32px; margin-bottom: 10px;">🤖</div>
+            <div style="color: #f8fafc; font-weight: 600;">LLM</div>
+            <div style="color: #e9d8fd; font-size: 0.85em;">Frozen weights</div>
+        </div>
+        <div style="color: #64748b; font-size: 32px;">→</div>
+        <div style="background: rgba(252, 129, 129, 0.2); padding: 20px 30px; border-radius: 12px; text-align: center; border: 2px solid #fc8181;">
+            <div style="font-size: 32px; margin-bottom: 10px;">❓</div>
+            <div style="color: #fc8181; font-weight: 500;">No Memory</div>
+            <div style="color: #a0aec0; font-size: 0.85em;">"I don't know"</div>
+        </div>
+    </div>
+    <div style="margin-top: 15px; padding: 12px; background: rgba(252, 129, 129, 0.1); border-radius: 8px; text-align: center;">
+        <span style="color: #fc8181; font-size: 0.9em;">⚠️ LLM has no way to remember user-specific information between sessions</span>
+    </div>
+</div>
+'''
+
+RAG_INTEGRATION_DIAGRAM_HTML = '''
+<div style="font-family: 'Outfit', system-ui, sans-serif; padding: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; color: #fff; margin-bottom: 20px; border: 1px solid rgba(255, 140, 66, 0.3);">
+    <h4 style="color: #ff8c42; margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px;">
+        <span style="background: #ff8c42; color: #1a1a2e; padding: 4px 12px; border-radius: 6px; font-size: 0.8em;">Step 2a</span>
+        Adding RAG (Retrieval-Augmented Generation)
+    </h4>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap;">
+        <div style="background: #2d3748; padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">👤</div>
+            <div style="color: #f8fafc; font-size: 0.9em;">Query</div>
+        </div>
+        <div style="color: #ff8c42; font-size: 24px;">→</div>
+        <div style="background: rgba(255, 140, 66, 0.2); padding: 15px 20px; border-radius: 10px; text-align: center; border: 1px dashed #ff8c42;">
+            <div style="font-size: 24px;">🔍</div>
+            <div style="color: #ff8c42; font-size: 0.9em;">Retriever</div>
+            <div style="color: #64748b; font-size: 0.75em;">keyword match</div>
+        </div>
+        <div style="color: #ff8c42; font-size: 24px;">→</div>
+        <div style="background: #744210; padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">🗃️</div>
+            <div style="color: #faf089; font-size: 0.9em;">Vector DB</div>
+            <div style="color: #64748b; font-size: 0.75em;">top-k docs</div>
+        </div>
+        <div style="color: #ff8c42; font-size: 24px;">→</div>
+        <div style="background: #3182ce; padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">📋</div>
+            <div style="color: #bee3f8; font-size: 0.9em;">Context</div>
+            <div style="color: #64748b; font-size: 0.75em;">prompt injection</div>
+        </div>
+        <div style="color: #ff8c42; font-size: 24px;">→</div>
+        <div style="background: linear-gradient(135deg, #805ad5 0%, #553c9a 100%); padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">🤖</div>
+            <div style="color: #f8fafc; font-size: 0.9em;">LLM</div>
+        </div>
+    </div>
+    <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div style="padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px;">
+            <span style="color: #22c55e; font-size: 0.85em;">✓ External memory storage</span>
+        </div>
+        <div style="padding: 10px; background: rgba(252, 129, 129, 0.1); border-radius: 6px;">
+            <span style="color: #fc8181; font-size: 0.85em;">✗ No pattern learning</span>
+        </div>
+    </div>
+</div>
+'''
+
+NEURAL_MEMORY_INTEGRATION_DIAGRAM_HTML = '''
+<div style="font-family: 'Outfit', system-ui, sans-serif; padding: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; color: #fff; margin-bottom: 20px; border: 1px solid rgba(0, 212, 255, 0.3);">
+    <h4 style="color: #00d4ff; margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px;">
+        <span style="background: #00d4ff; color: #1a1a2e; padding: 4px 12px; border-radius: 6px; font-size: 0.8em;">Step 2b</span>
+        Adding Neural Memory (Test-Time Training)
+    </h4>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap;">
+        <div style="background: #2d3748; padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">👤</div>
+            <div style="color: #f8fafc; font-size: 0.9em;">Query</div>
+        </div>
+        <div style="color: #00d4ff; font-size: 24px;">→</div>
+        <div style="background: rgba(0, 212, 255, 0.2); padding: 15px 20px; border-radius: 10px; text-align: center; border: 2px solid #00d4ff;">
+            <div style="font-size: 24px;">🧠</div>
+            <div style="color: #00d4ff; font-size: 0.9em; font-weight: 600;">Neural Memory</div>
+            <div style="color: #64748b; font-size: 0.75em;">TTT Module</div>
+        </div>
+        <div style="color: #00d4ff; font-size: 24px;">→</div>
+        <div style="background: #2f855a; padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">📊</div>
+            <div style="color: #9ae6b4; font-size: 0.9em;">Patterns</div>
+            <div style="color: #64748b; font-size: 0.75em;">+ surprise</div>
+        </div>
+        <div style="color: #00d4ff; font-size: 24px;">→</div>
+        <div style="background: #3182ce; padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">📋</div>
+            <div style="color: #bee3f8; font-size: 0.9em;">Rich Context</div>
+            <div style="color: #64748b; font-size: 0.75em;">all facts + hints</div>
+        </div>
+        <div style="color: #00d4ff; font-size: 24px;">→</div>
+        <div style="background: linear-gradient(135deg, #805ad5 0%, #553c9a 100%); padding: 15px 20px; border-radius: 10px; text-align: center;">
+            <div style="font-size: 24px;">🤖</div>
+            <div style="color: #f8fafc; font-size: 0.9em;">LLM</div>
+        </div>
+    </div>
+    <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+        <div style="padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px;">
+            <span style="color: #22c55e; font-size: 0.85em;">✓ Learns patterns</span>
+        </div>
+        <div style="padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px;">
+            <span style="color: #22c55e; font-size: 0.85em;">✓ Fixed memory size</span>
+        </div>
+        <div style="padding: 10px; background: rgba(34, 197, 94, 0.1); border-radius: 6px;">
+            <span style="color: #22c55e; font-size: 0.85em;">✓ Can infer/predict</span>
+        </div>
+    </div>
+</div>
+'''
+
+DOCKER_DEPLOYMENT_DIAGRAM_HTML = '''
+<div style="font-family: 'Outfit', system-ui, sans-serif; padding: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; color: #fff; border: 1px solid rgba(168, 85, 247, 0.3);">
+    <h4 style="color: #a855f7; margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px;">
+        <span style="background: #a855f7; color: #1a1a2e; padding: 4px 12px; border-radius: 6px; font-size: 0.8em;">Step 3</span>
+        Docker Deployment (Production Ready)
+    </h4>
+    <div style="display: flex; align-items: stretch; justify-content: center; gap: 20px; flex-wrap: wrap;">
+        <!-- Docker Container -->
+        <div style="background: rgba(168, 85, 247, 0.1); border: 2px solid #a855f7; border-radius: 12px; padding: 20px; min-width: 280px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <span style="font-size: 1.5em;">🐳</span>
+                <span style="color: #a855f7; font-weight: 600;">Docker Container</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="background: rgba(0, 212, 255, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.3);">
+                    <div style="color: #00d4ff; font-size: 0.85em; font-weight: 500;">🧠 Neural Memory</div>
+                    <div style="color: #64748b; font-size: 0.75em;">PyTorch TTT Module</div>
+                </div>
+                <div style="background: rgba(34, 197, 94, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);">
+                    <div style="color: #22c55e; font-size: 0.85em; font-weight: 500;">🔌 MCP Server</div>
+                    <div style="color: #64748b; font-size: 0.75em;">Claude Desktop Integration</div>
+                </div>
+                <div style="background: rgba(255, 140, 66, 0.2); padding: 10px; border-radius: 8px; border: 1px solid rgba(255, 140, 66, 0.3);">
+                    <div style="color: #ff8c42; font-size: 0.85em; font-weight: 500;">🌐 HTTP API</div>
+                    <div style="color: #64748b; font-size: 0.75em;">REST Endpoints</div>
+                </div>
+            </div>
+        </div>
+        <!-- Volume -->
+        <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px;">
+            <div style="color: #64748b; font-size: 24px;">↔</div>
+            <div style="background: #374151; padding: 15px 20px; border-radius: 10px; text-align: center;">
+                <div style="font-size: 24px;">💾</div>
+                <div style="color: #f8fafc; font-size: 0.9em;">Volume</div>
+                <div style="color: #64748b; font-size: 0.75em;">Checkpoints</div>
+            </div>
+        </div>
+    </div>
+    <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 10px;">
+        <div style="color: #a0aec0; font-size: 0.9em;">
+            <strong style="color: #a855f7;">Why Docker?</strong> Learned neural weights persist across container restarts via Docker volumes. Deploy anywhere with identical behavior. Version control your AI's memory state like Git commits.
+        </div>
+    </div>
+</div>
+'''
+
+# =============================================================================
 # DOCKER ECOSYSTEM INTEGRATION
 # =============================================================================
 
@@ -1505,14 +2162,9 @@ This project demonstrates the ability to:
 # GRADIO INTERFACE
 # =============================================================================
 
-with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
-    gr.Markdown("""
-    # Docker Neural Memory
-    ## Real Test-Time Training - Not a Simulation
-
-    This demo runs **actual PyTorch** code. When you observe content,
-    real gradients flow and real weights update.
-    """)
+with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft(), css=CUSTOM_CSS) as demo:
+    # Branded header
+    gr.HTML(HEADER_HTML)
 
     with gr.Tabs():
         # TAB 1: Comparison Demo (NEW - Main Feature)
@@ -1631,67 +2283,36 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
             # Architecture Summary
             gr.Markdown(ARCHITECTURE_SUMMARY_MD)
 
-        # TAB 3: Neural Memory Playground (original Live Demo)
-        with gr.TabItem("Neural Memory Playground"):
-            gr.Markdown("### Watch Real Neural Learning")
+        # TAB 3: Key Concepts
+        with gr.TabItem("Key Concepts"):
+            gr.HTML(KEY_CONCEPTS_HTML)
 
-            with gr.Row():
-                with gr.Column(scale=1):
-                    observe_input = gr.Textbox(
-                        label="Content to Observe",
-                        placeholder="Enter text to trigger real learning...",
-                        lines=3,
-                    )
-                    observe_btn = gr.Button("Observe (Learn)", variant="primary", size="lg")
-                    observe_output = gr.Markdown()
+        # TAB 4: Integration & Docker
+        with gr.TabItem("Integration & Docker"):
+            gr.Markdown("## How Memory Modules Integrate with LLMs")
+            gr.Markdown("Follow this incremental explanation to understand how both RAG and Neural Memory attach to a vanilla LLM.")
 
-                with gr.Column(scale=1):
-                    weights_plot = gr.Plot(label="Neural Weights (Real PyTorch)")
+            # Step 1: Vanilla LLM
+            gr.HTML(VANILLA_LLM_DIAGRAM_HTML)
 
-            history_plot = gr.Plot(label="Learning History")
+            # Step 2a: RAG Integration
+            gr.HTML(RAG_INTEGRATION_DIAGRAM_HTML)
 
-            observe_btn.click(
-                observe_content,
-                inputs=[observe_input],
-                outputs=[observe_output, weights_plot, history_plot],
-            )
+            # Step 2b: Neural Memory Integration
+            gr.HTML(NEURAL_MEMORY_INTEGRATION_DIAGRAM_HTML)
 
-            gr.Markdown("---")
+            # Step 3: Docker Deployment
+            gr.HTML(DOCKER_DEPLOYMENT_DIAGRAM_HTML)
 
-            with gr.Row():
-                with gr.Column():
-                    surprise_input = gr.Textbox(
-                        label="Check Surprise (No Learning)",
-                        placeholder="Check novelty without updating weights...",
-                    )
-                    surprise_btn = gr.Button("Check Surprise")
-                    surprise_output = gr.Markdown()
-                    surprise_btn.click(check_surprise, inputs=[surprise_input], outputs=[surprise_output])
-
-                with gr.Column():
-                    stats_btn = gr.Button("Get Memory Stats")
-                    stats_output = gr.Markdown()
-                    stats_btn.click(get_memory_stats, outputs=[stats_output])
-
-            reset_btn = gr.Button("Reset Memory", variant="secondary")
-            reset_output = gr.Markdown()
-            reset_btn.click(reset_memory, outputs=[reset_output])
-
-        # TAB 4: Docker Integration
-        with gr.TabItem("Docker Integration"):
+            # Docker details
             gr.Markdown(DOCKER_INTEGRATION_MD)
 
         # TAB 5: About
         with gr.TabItem("About"):
             gr.Markdown(ABOUT_MD)
 
-    gr.Markdown("""
-    ---
-    *Docker Neural Memory - Containerized AI memory with real test-time training*
-
-    [GitHub](https://github.com/macayaven/docker-neural-memory) |
-    [Contact](mailto:macayaven@gmail.com)
-    """)
+    # Polished footer with profile links
+    gr.HTML(FOOTER_HTML)
 
 
 if __name__ == "__main__":
