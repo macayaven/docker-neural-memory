@@ -4,24 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Docker Neural Memory** is a containerized implementation of test-time training (TTT) memory, based on Google's Titans architecture. Unlike traditional AI memory solutions that store and retrieve embeddings, this system **learns** during inference—its neural weights update with every interaction.
-
-See `SPEC.md` for the full technical specification.
+**Docker Neural Memory** is an implementation of test-time training (TTT) memory, based on Google's Titans architecture. Unlike traditional AI memory solutions that store and retrieve embeddings, this system **learns** during inference—its neural weights update with every interaction.
 
 ## Build & Development Commands
 
 ```bash
-# Build and run container
-docker compose build
-docker compose up -d
-
 # Local development
 pip install -e ".[dev]"          # Dev dependencies
-pip install -e ".[all]"          # All optional deps (mcp, http, observability)
 
-# Run servers
+# Run MCP server
 python -m src.mcp_server         # MCP server (stdio mode)
-python -m src.http_server        # HTTP API server (port 8765)
 
 # Testing
 pytest                           # Run all tests
@@ -49,19 +41,8 @@ src/
 ├── mcp_server/
 │   ├── server.py           # NeuralMemoryServer - MCP protocol handler
 │   └── tools.py            # TOOL_SCHEMAS dict - MCP tool definitions
-├── http_server.py          # FastAPI REST wrapper (alternative to MCP)
-├── config.py               # Pydantic Settings (MemoryConfig, TTTConfig, etc.)
-├── state/
-│   ├── checkpoint.py       # CheckpointManager - save/restore weights
-│   └── versioning.py       # VersionManager - fork/branch logic
-└── observability/
-    └── metrics.py          # Langfuse integration for traces
+└── config.py               # Pydantic Settings (MemoryConfig, TTTConfig, etc.)
 ```
-
-### Two Server Modes
-
-1. **MCP Server** (`src.mcp_server`): Model Context Protocol for Claude/LLM integration, stdio-based
-2. **HTTP Server** (`src.http_server`): REST API at port 8765 with `/observe`, `/surprise`, `/stats`, `/reset` endpoints
 
 ### Key Concepts
 
@@ -86,10 +67,6 @@ surprise(input)  → measure novelty
 | `infer` | Query using learned representations |
 | `surprise` | Measure novelty of input |
 | `consolidate` | Compress patterns (like sleep) |
-| `checkpoint` | Save learned state |
-| `restore` | Load previous state |
-| `fork` | Branch memory state |
-| `list_checkpoints` | List all checkpoints |
 | `stats` | Get memory statistics |
 | `attention_map` | Visualize attention weights |
 | `explain` | Export patterns as summaries |
@@ -102,7 +79,6 @@ Uses Pydantic Settings with environment variable prefixes (see `src/config.py`):
 |--------|--------------|---------------|
 | `MEMORY_` | `MemoryConfig` | `DIM` (512), `LEARNING_RATE` (0.01), `DEVICE` (cpu) |
 | `TTT_` | `TTTConfig` | `VARIANT` (mlp/linear), `NUM_STEPS` (1) |
-| `CHECKPOINT_` | `CheckpointConfig` | `DIR`, `AUTO_CHECKPOINT` |
 | `MCP_` | `MCPConfig` | `HOST`, `PORT` (8765), `MODE` (stdio) |
 
 ## Testing Verification
@@ -110,7 +86,6 @@ Uses Pydantic Settings with environment variable prefixes (see `src/config.py`):
 When testing learning behavior:
 1. **Surprise decreases**: Repeated patterns should show lower surprise scores
 2. **Weights change**: `weight_delta` should be non-zero after `observe()`
-3. **State persists**: Checkpoints should restore exact weight state
 
 ## Key Papers
 

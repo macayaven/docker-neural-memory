@@ -4,14 +4,17 @@ Containerized neural memory that learns at test time using the Titans/TTT archit
 
 Unlike traditional AI memory (RAG) that stores and retrieves embeddings, this system **learns** during inference - its neural weights update with every interaction.
 
+## Live Demo
+
+Try it now: [HuggingFace Space](https://huggingface.co/spaces/macayaven/docker-neural-memory)
+
 ## Quick Start
 
 ```bash
-# Build and run
-docker compose up -d
-
-# Or locally
+# Install locally
 pip install -e ".[dev]"
+
+# Run MCP server
 python -m src.mcp_server
 ```
 
@@ -19,8 +22,7 @@ python -m src.mcp_server
 
 - **Test-Time Training**: Memory updates via gradient descent during inference
 - **MCP Interface**: Standard Model Context Protocol for tool integration
-- **Checkpoint Management**: Git-like versioning for learned states
-- **Observability**: Langfuse integration for training and inference traces
+- **Surprise Scoring**: Quantifies how novel an input is to the learned model
 
 ## Architecture
 
@@ -38,9 +40,8 @@ Neural Memory:       observe(context) -> weights update -> infer(prompt)
 | `observe` | Feed context, trigger learning |
 | `infer` | Query using learned representations |
 | `surprise` | Measure novelty of input (0-1) |
-| `checkpoint` | Save learned state |
-| `restore` | Load previous state |
-| `fork` | Branch memory state |
+| `consolidate` | Compress patterns (like sleep) |
+| `stats` | Get memory statistics |
 
 ## Development
 

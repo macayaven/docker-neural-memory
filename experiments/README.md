@@ -5,18 +5,14 @@ Standardized experiment framework for validating and benchmarking the neural mem
 ## Quick Start
 
 ```bash
-# Run all experiments (in Docker)
-docker compose -f docker-compose.dev.yml run --rm dev \
-    python experiments/scripts/run_experiments.py --suite all
+# Run all experiments
+python experiments/scripts/run_experiments.py --suite all
 
 # Run specific suite
-docker compose -f docker-compose.dev.yml run --rm dev \
-    python experiments/scripts/run_experiments.py --suite learning
+python experiments/scripts/run_experiments.py --suite learning
 
 # With custom hyperparameters
-docker compose -f docker-compose.dev.yml run --rm dev \
-    python experiments/scripts/run_experiments.py \
-        --suite all --dim 512 --lr 0.005
+python experiments/scripts/run_experiments.py --suite all --dim 512 --lr 0.005
 ```
 
 ## Experiment Suites
@@ -49,34 +45,6 @@ Stress tests memory limits:
 - **recovery_after_consolidation**: Consolidation frees capacity
 - **dimension_vs_capacity**: How dim affects capacity
 
-## Langfuse Integration
-
-Results are automatically tracked to Langfuse if configured:
-
-```bash
-export LANGFUSE_PUBLIC_KEY="pk-..."
-export LANGFUSE_SECRET_KEY="sk-..."
-export LANGFUSE_HOST="https://cloud.langfuse.com"  # or your self-hosted URL
-```
-
-Disable with `--no-langfuse` flag.
-
-## Output
-
-Results are saved to `experiments/results/` as JSON:
-
-```json
-{
-  "experiment_name": "exp_all_20240115_143052",
-  "config": {"dim": 256, "learning_rate": 0.01},
-  "suites": {
-    "learning": [
-      {"test_id": "repeat_exact", "passed": true, "metrics": {...}}
-    ]
-  }
-}
-```
-
 ## Metrics Tracked
 
 | Metric | Description | Goal |
@@ -105,5 +73,3 @@ for dim in 128 256 512; do
     done
 done
 ```
-
-Results can be compared in Langfuse dashboard.
