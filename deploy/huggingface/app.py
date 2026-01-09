@@ -109,6 +109,115 @@ def get_embedding(text: str) -> np.ndarray:
         return flat
 
 
+def create_knowledge_base_visualization() -> plt.Figure:
+    """Create visualization of the knowledge base (RAG store)."""
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    if not knowledge_base:
+        ax.text(
+            0.5, 0.5,
+            "No facts in knowledge base yet.\nAdd facts to see them here.",
+            ha="center", va="center", fontsize=14, color="gray"
+        )
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis("off")
+        ax.set_title("Knowledge Base (RAG Store)", fontsize=14, fontweight="bold")
+        return fig
+
+    # Create a visual list of facts
+    n_facts = len(knowledge_base)
+    y_positions = np.linspace(0.9, 0.1, min(n_facts, 10))
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    # Title
+    ax.set_title(f"Knowledge Base (RAG Store) - {n_facts} Facts", fontsize=14, fontweight="bold")
+
+    # Draw facts as cards
+    for i, (y_pos, item) in enumerate(zip(y_positions, knowledge_base[-10:])):
+        fact_text = item["fact"]
+        if len(fact_text) > 60:
+            fact_text = fact_text[:57] + "..."
+
+        # Draw a rounded rectangle
+        rect = plt.Rectangle((0.02, y_pos - 0.035), 0.96, 0.07,
+                             facecolor="#e8f4f8", edgecolor="#3498db",
+                             linewidth=2, alpha=0.8, zorder=1)
+        ax.add_patch(rect)
+
+        # Add fact number and text
+        ax.text(0.05, y_pos, f"#{len(knowledge_base) - len(knowledge_base[-10:]) + i + 1}",
+               fontsize=10, fontweight="bold", color="#2980b9", va="center")
+        ax.text(0.12, y_pos, fact_text, fontsize=10, va="center", color="#2c3e50")
+
+    if n_facts > 10:
+        ax.text(0.5, 0.02, f"... and {n_facts - 10} more facts",
+               ha="center", fontsize=9, color="gray", style="italic")
+
+    plt.tight_layout()
+    return fig
+
+
+def create_neural_memory_state_visualization() -> plt.Figure:
+    """Create visualization of the neural memory state."""
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+
+    # 1. Weight distribution histogram
+    ax1 = axes[0]
+    with torch.no_grad():
+        all_weights = []
+        for param in memory.memory_net.parameters():
+            all_weights.extend(param.data.cpu().numpy().flatten())
+        all_weights = np.array(all_weights)
+
+    ax1.hist(all_weights, bins=50, color="#3498db", alpha=0.7, edgecolor="white")
+    ax1.axvline(x=0, color="red", linestyle="--", alpha=0.5)
+    ax1.set_title("Weight Distribution", fontsize=11, fontweight="bold")
+    ax1.set_xlabel("Weight Value")
+    ax1.set_ylabel("Count")
+    ax1.grid(True, alpha=0.3)
+
+    # 2. Weight heatmap (sample)
+    ax2 = axes[1]
+    weights = get_weight_sample()
+    im = ax2.imshow(weights, cmap="RdBu_r", aspect="auto", vmin=-0.5, vmax=0.5)
+    ax2.set_title("Weight Matrix Sample (16x16)", fontsize=11, fontweight="bold")
+    ax2.axis("off")
+    plt.colorbar(im, ax=ax2, label="Value")
+
+    # 3. Memory stats
+    ax3 = axes[2]
+    ax3.axis("off")
+    stats = memory.get_stats()
+
+    stats_text = f"""
+    Neural Memory State
+    ───────────────────
+    Parameters: {stats['weight_parameters']:,}
+    Dimension: {stats['dimension']}
+    Learning Rate: {stats['learning_rate']:.4f}
+
+    Observations: {stats['total_observations']}
+    Avg Surprise: {stats['avg_surprise']:.4f}
+
+    Weight Stats:
+    • Mean: {np.mean(all_weights):.4f}
+    • Std: {np.std(all_weights):.4f}
+    • Min: {np.min(all_weights):.4f}
+    • Max: {np.max(all_weights):.4f}
+    """
+    ax3.text(0.1, 0.5, stats_text, fontsize=10, family="monospace",
+            va="center", transform=ax3.transAxes,
+            bbox={"boxstyle": "round,pad=0.5", "facecolor": "#f0f0f0", "alpha": 0.8})
+    ax3.set_title("Memory Statistics", fontsize=11, fontweight="bold")
+
+    plt.tight_layout()
+    return fig
+
+
 def create_tsne_visualization() -> plt.Figure:
     """Create t-SNE visualization of learned representations."""
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -258,10 +367,15 @@ Based ONLY on the knowledge above, answer questions. If the information is not i
         return f"Error: {e!s}", 0.0
 
 
-def add_to_knowledge_base(fact: str) -> Tuple[str, plt.Figure]:
+def add_to_knowledge_base(fact: str) -> Tuple[str, plt.Figure, plt.Figure, plt.Figure]:
     """Add a fact to the knowledge base and observe it in neural memory."""
     if not fact.strip():
-        return "Please enter a fact to add.", create_tsne_visualization()
+        return (
+            "Please enter a fact to add.",
+            create_tsne_visualization(),
+            create_neural_memory_state_visualization(),
+            create_knowledge_base_visualization(),
+        )
 
     # Add to knowledge base
     knowledge_base.append({"fact": fact, "timestamp": time.time()})
@@ -283,15 +397,22 @@ def add_to_knowledge_base(fact: str) -> Tuple[str, plt.Figure]:
 **Fact:** "{fact}"
 
 **Neural Memory Response:**
-- Surprise: {result['surprise']:.4f}
-- Weight Delta: {result['weight_delta']:.6f}
-- Learned: {'Yes' if result['learned'] else 'No'}
+| Metric | Value |
+|--------|-------|
+| Surprise | {result['surprise']:.4f} |
+| Weight Delta | {result['weight_delta']:.6f} |
+| Learned | {'Yes' if result['learned'] else 'No'} |
 
 **Knowledge Base Size:** {len(knowledge_base)} facts
 **Embeddings Stored:** {len(embeddings_store)}
 """
 
-    return output, create_tsne_visualization()
+    return (
+        output,
+        create_tsne_visualization(),
+        create_neural_memory_state_visualization(),
+        create_knowledge_base_visualization(),
+    )
 
 
 def get_knowledge_context() -> str:
@@ -301,18 +422,20 @@ def get_knowledge_context() -> str:
     return "\n".join([f"- {item['fact']}" for item in knowledge_base])
 
 
-def compare_responses(question: str) -> Tuple[str, str, str]:
+def compare_responses(question: str) -> Tuple[str, str, str, plt.Figure, plt.Figure]:
     """Compare vanilla LLM vs memory-augmented LLM on the same question."""
     global metrics
 
     if not question.strip():
-        return "", "", ""
+        return "", "", "", create_neural_memory_state_visualization(), create_knowledge_base_visualization()
 
     if not LLM_AVAILABLE:
         return (
             "LLM not available. Please set HF_TOKEN environment variable.",
             "LLM not available.",
             "Comparison requires LLM access.",
+            create_neural_memory_state_visualization(),
+            create_knowledge_base_visualization(),
         )
 
     # Get context from knowledge base
@@ -347,32 +470,48 @@ def compare_responses(question: str) -> Tuple[str, str, str]:
     if not nm_hedges and context:
         metrics.nm_correct += 1
 
-    # Format outputs
+    # Format outputs with clear response display
     nm_output = f"""### With Neural Memory
 
-{nm_response}
+**Question:** {question}
+
+**Response:**
+> {nm_response}
 
 ---
 **Metrics:**
-- Surprise: {surprise:.3f}
-- Response Time: {nm_time:.2f}s
-- Knowledge Used: {len(knowledge_base)} facts
+| Metric | Value |
+|--------|-------|
+| Surprise Score | {surprise:.3f} |
+| Response Time | {nm_time:.2f}s |
+| Facts Used | {len(knowledge_base)} |
 """
 
     vanilla_output = f"""### Vanilla LLM (No Memory)
 
-{vanilla_response}
+**Question:** {question}
+
+**Response:**
+> {vanilla_response}
 
 ---
 **Metrics:**
-- Response Time: {vanilla_time:.2f}s
-- No context provided
+| Metric | Value |
+|--------|-------|
+| Response Time | {vanilla_time:.2f}s |
+| Context | None |
 """
 
     # Comparison summary
     comparison = get_comparison_summary()
 
-    return nm_output, vanilla_output, comparison
+    return (
+        nm_output,
+        vanilla_output,
+        comparison,
+        create_neural_memory_state_visualization(),
+        create_knowledge_base_visualization(),
+    )
 
 
 def get_comparison_summary() -> str:
@@ -416,13 +555,18 @@ def get_comparison_summary() -> str:
 """
 
 
-def reset_comparison() -> Tuple[str, plt.Figure]:
+def reset_comparison() -> Tuple[str, plt.Figure, plt.Figure, plt.Figure]:
     """Reset comparison metrics and knowledge base."""
     global metrics, knowledge_base, embeddings_store
     metrics = ComparisonMetrics()
     knowledge_base = []
     embeddings_store = []
-    return "Comparison reset. Knowledge base and embeddings cleared.", create_tsne_visualization()
+    return (
+        "Comparison reset. Knowledge base and embeddings cleared.",
+        create_tsne_visualization(),
+        create_neural_memory_state_visualization(),
+        create_knowledge_base_visualization(),
+    )
 
 
 def reset_memory():
@@ -767,17 +911,26 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
                     """)
 
                 with gr.Column(scale=1):
-                    gr.Markdown("#### Embedding Space (t-SNE)")
-                    tsne_plot = gr.Plot(label="Neural Memory Representations")
+                    gr.Markdown("#### Knowledge Base (RAG Store)")
+                    kb_plot = gr.Plot(label="Facts Stored")
+
+            # Visualizations row
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("#### Neural Memory State")
+                    neural_state_plot = gr.Plot(label="Neural Network Weights & Stats")
+                with gr.Column(scale=1):
+                    gr.Markdown("#### Embedding Space")
+                    tsne_plot = gr.Plot(label="t-SNE/PCA Visualization")
 
             add_fact_btn.click(
                 add_to_knowledge_base,
                 inputs=[fact_input],
-                outputs=[fact_output, tsne_plot]
+                outputs=[fact_output, tsne_plot, neural_state_plot, kb_plot]
             )
 
             gr.Markdown("---")
-            gr.Markdown("#### Step 2: Ask Questions")
+            gr.Markdown("#### Step 2: Ask Questions & Compare Responses")
 
             question_input = gr.Textbox(
                 label="Ask a Question",
@@ -789,22 +942,25 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
                 compare_btn = gr.Button("Compare Responses", variant="primary", size="lg")
                 reset_compare_btn = gr.Button("Reset Comparison", variant="secondary")
 
+            # Response display - side by side with clear headers
             with gr.Row():
                 with gr.Column():
-                    nm_response = gr.Markdown(label="With Neural Memory")
+                    gr.Markdown("##### Memory-Augmented Response")
+                    nm_response = gr.Markdown()
                 with gr.Column():
-                    vanilla_response = gr.Markdown(label="Vanilla LLM")
+                    gr.Markdown("##### Vanilla LLM Response")
+                    vanilla_response = gr.Markdown()
 
             comparison_summary = gr.Markdown(label="Comparison Metrics")
 
             compare_btn.click(
                 compare_responses,
                 inputs=[question_input],
-                outputs=[nm_response, vanilla_response, comparison_summary],
+                outputs=[nm_response, vanilla_response, comparison_summary, neural_state_plot, kb_plot],
             )
             reset_compare_btn.click(
                 reset_comparison,
-                outputs=[comparison_summary, tsne_plot]
+                outputs=[comparison_summary, tsne_plot, neural_state_plot, kb_plot]
             )
 
         # TAB 2: Live Demo (original)
