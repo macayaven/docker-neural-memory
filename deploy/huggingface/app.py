@@ -12,7 +12,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import gradio as gr
 import matplotlib
@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from huggingface_hub import InferenceClient
-from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 matplotlib.use("Agg")
 
@@ -45,8 +45,8 @@ except Exception as e:
 # When deployed to HF Spaces, src/ is copied to the same directory as app.py
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.config import MemoryConfig
-from src.memory.neural_memory import NeuralMemory
+from src.config import MemoryConfig  # noqa: E402
+from src.memory.neural_memory import NeuralMemory  # noqa: E402
 
 # =============================================================================
 # REAL NEURAL MEMORY INSTANCE
@@ -143,9 +143,6 @@ def create_tsne_visualization() -> plt.Figure:
         reduced = reducer.fit_transform(embeddings)
         method = "t-SNE"
 
-    # Color by surprise (red = high surprise/novel, blue = low surprise/familiar)
-    colors = plt.cm.RdYlBu_r(surprises)
-
     # Plot points
     scatter = ax.scatter(
         reduced[:, 0], reduced[:, 1],
@@ -159,7 +156,7 @@ def create_tsne_visualization() -> plt.Figure:
             label, (reduced[i, 0], reduced[i, 1]),
             xytext=(5, 5), textcoords="offset points",
             fontsize=9, alpha=0.8,
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7)
+            bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "alpha": 0.7}
         )
 
     # Colorbar
@@ -228,30 +225,36 @@ def call_llm(prompt: str, context: str = "") -> Tuple[str, float]:
         return "[LLM not available - set HF_TOKEN for comparison demo]", 0.0
 
     try:
-        full_prompt = prompt
+        # Build messages for chat completion
         if context:
-            full_prompt = f"""You have access to the following knowledge:
+            system_msg = f"""You have access to the following knowledge:
 
 {context}
 
-Based ONLY on the knowledge above, answer this question. If the information is not in the knowledge provided, say "I don't have information about that."
-
-Question: {prompt}
-
-Answer:"""
+Based ONLY on the knowledge above, answer questions. If the information is not in the knowledge provided, say "I don't have information about that."
+"""
+            messages = [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": prompt},
+            ]
+        else:
+            messages = [
+                {"role": "user", "content": prompt},
+            ]
 
         start = time.time()
-        response = hf_client.text_generation(
-            full_prompt,
-            max_new_tokens=150,
+        response = hf_client.chat_completion(
+            messages=messages,
+            max_tokens=150,
             temperature=0.7,
-            do_sample=True,
         )
         elapsed = time.time() - start
 
-        return response.strip(), elapsed
+        # Extract the response content
+        answer = response.choices[0].message.content
+        return answer.strip() if answer else "", elapsed
     except Exception as e:
-        return f"Error: {str(e)}", 0.0
+        return f"Error: {e!s}", 0.0
 
 
 def add_to_knowledge_base(fact: str) -> Tuple[str, plt.Figure]:
