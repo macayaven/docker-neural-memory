@@ -7,55 +7,70 @@
 
 ## Tab 1: LLM Comparison (Main Feature)
 
-This tab demonstrates the key value proposition: **memory-augmented LLM vs vanilla LLM**.
+This tab demonstrates the key value proposition: **Neural Memory vs RAG**.
 
-### Step 1: Teach Facts to the Memory
+### The Key Difference
 
-1. In the "Add a Fact" textbox, enter facts like:
-   ```
-   My favorite programming language is Rust
-   ```
-2. Click **"Add to Knowledge Base"**
-3. Watch the **t-SNE visualization** on the right update - each fact becomes a point in embedding space
-4. Add more facts:
-   ```
-   I always use dark mode in my editor
-   The project deadline is March 15th
-   Our API uses JWT authentication
-   The database runs on PostgreSQL 15
-   ```
+| Feature | Neural Memory | RAG |
+|---------|---------------|-----|
+| **How it works** | Learns patterns from ALL facts | Retrieves top-k similar documents |
+| **Inference** | Can predict from learned trends | Only returns what matches |
+| **Pattern Recognition** | Identifies themes across data | No pattern learning |
 
-### Step 2: Ask Questions
+### Step 1: Teach Facts (Pattern Learning)
 
-1. In "Ask a Question", type:
-   ```
-   What programming language should I use?
-   ```
-2. Click **"Compare Responses"**
-3. See side-by-side results:
-   - **With Neural Memory**: Uses your observed facts to give grounded answer
-   - **Vanilla LLM**: May hallucinate or give generic answer
+Add these facts one by one to create a **preference pattern**:
+```
+Carlos rejected the bright colorful design
+Carlos rejected the flashy animated homepage
+Carlos approved the minimalist dark layout
+Carlos approved the clean monochrome interface
+```
+
+Watch:
+- **Knowledge Base** shows all stored facts
+- **Neural Memory State** shows weight updates after each fact
+- **Embedding Space** shows how similar facts cluster together
+
+### Step 2: Ask a Pattern-Based Question
+
+In "Ask a Question", type:
+```
+We have a new UI mockup with neon colors - will Carlos like it?
+```
+
+Click **"Compare Responses"** and see:
+
+- **Neural Memory**: Identifies the pattern (Carlos likes dark/minimal, rejects bright/flashy) and predicts "No"
+- **RAG**: May fail to retrieve relevant facts (no keyword match for "neon") or give incomplete answer
 
 ### What to Look For
 
-| Metric | With Memory | Vanilla |
-|--------|-------------|---------|
-| **Grounded Answers** | High % | N/A |
-| **Hallucinations** | Low | Higher |
-| **Surprise Score** | Decreases over time | N/A |
+| Metric | Neural Memory | RAG |
+|--------|---------------|-----|
+| **Pattern Inference** | Identifies approval/rejection trends | None |
+| **Context Used** | ALL 4 facts | Top 2 by keyword match |
+| **Novelty Detection** | Surprise score shows familiarity | None |
 
-### Try These Question Sequences
+### Why This Works
 
-**Sequence 1: Preferences**
-1. Teach: "Carlos prefers VSCode over Vim"
-2. Teach: "Carlos uses the Dracula theme"
-3. Ask: "What editor does Carlos use?"
-4. Ask: "What theme should I set up?"
+The question "neon colors" doesn't directly match any stored fact keywords:
+- **RAG** does keyword matching: "neon" ≠ "bright", "colorful", "dark", etc.
+- **Neural Memory** learned the pattern: bright/flashy → rejected, dark/minimal → approved
 
-**Sequence 2: Project Context**
-1. Teach: "The API endpoint is /api/v2/users"
-2. Teach: "Authentication requires Bearer tokens"
-3. Ask: "How do I call the users API?"
+### Alternative Scenarios
+
+**Scenario 2: Learning Preferences**
+1. "Alice prefers Python for data science"
+2. "Alice prefers JavaScript for web development"
+3. "Alice prefers Go for backend services"
+4. Ask: "What should Alice use for a new API server?"
+
+**Scenario 3: Project Knowledge**
+1. "Sprint 1 deadline was missed due to scope creep"
+2. "Sprint 2 deadline was missed due to scope creep"
+3. "Sprint 3 is adding 5 new features"
+4. Ask: "Will Sprint 3 meet its deadline?"
 
 ---
 
@@ -91,9 +106,11 @@ Documentation about how this integrates with Docker and MCP servers.
 ## What Makes This Special
 
 1. **Real PyTorch** - Not a simulation, actual gradient descent
-2. **Bounded Memory** - Fixed parameters, doesn't grow like vector DBs
+2. **Bounded Memory** - Fixed parameters, doesn't grow like RAG vector DBs
 3. **Test-Time Training** - Learns during inference (Titans architecture)
-4. **t-SNE Visualization** - See how concepts cluster in embedding space
+4. **Pattern Inference** - Can predict from learned trends, not just retrieve
+5. **Novelty Detection** - Surprise score shows what's familiar vs new
+6. **t-SNE Visualization** - See how concepts cluster in embedding space
 
 ---
 

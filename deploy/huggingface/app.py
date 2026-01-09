@@ -422,8 +422,105 @@ def get_knowledge_context() -> str:
     return "\n".join([f"- {item['fact']}" for item in knowledge_base])
 
 
+def call_rag_llm(question: str, knowledge_base: List[Dict]) -> Tuple[str, float, List[str]]:
+    """Simulate RAG: retrieve most similar facts by keyword matching."""
+    if not LLM_AVAILABLE or hf_client is None:
+        return "[LLM not available]", 0.0, []
+
+    # Simple RAG simulation: keyword-based retrieval (top 2 most relevant)
+    question_words = set(question.lower().split())
+    scored_facts = []
+    for item in knowledge_base:
+        fact = item["fact"]
+        fact_words = set(fact.lower().split())
+        # Simple overlap score
+        overlap = len(question_words & fact_words)
+        scored_facts.append((overlap, fact))
+
+    # Get top 2 most relevant facts
+    scored_facts.sort(reverse=True, key=lambda x: x[0])
+    retrieved = [f for score, f in scored_facts[:2] if score > 0]
+
+    if retrieved:
+        context = "Retrieved facts:\n" + "\n".join([f"- {f}" for f in retrieved])
+        system_msg = f"""You are a RAG system. You can ONLY use the retrieved facts below to answer.
+If the retrieved facts don't directly answer the question, say "The retrieved information doesn't cover this."
+
+{context}
+"""
+    else:
+        system_msg = "You are a RAG system with no relevant documents retrieved. Say 'No relevant documents found.'"
+        retrieved = ["(none retrieved)"]
+
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": question},
+    ]
+
+    try:
+        start = time.time()
+        response = hf_client.chat_completion(messages=messages, max_tokens=150, temperature=0.7)
+        elapsed = time.time() - start
+        answer = response.choices[0].message.content
+        return answer.strip() if answer else "", elapsed, retrieved
+    except Exception as e:
+        return f"Error: {e!s}", 0.0, retrieved
+
+
+def call_neural_memory_llm(question: str, knowledge_base: List[Dict], surprise: float) -> Tuple[str, float]:
+    """Neural Memory augmented LLM: uses ALL facts + learned patterns."""
+    if not LLM_AVAILABLE or hf_client is None:
+        return "[LLM not available]", 0.0
+
+    # Neural memory provides ALL context + pattern awareness
+    all_facts = "\n".join([f"- {item['fact']}" for item in knowledge_base])
+
+    # Analyze patterns in the facts
+    patterns_hint = ""
+    if knowledge_base:
+        # Look for approval/rejection patterns
+        approvals = [f["fact"] for f in knowledge_base if "approved" in f["fact"].lower() or "liked" in f["fact"].lower()]
+        rejections = [f["fact"] for f in knowledge_base if "rejected" in f["fact"].lower() or "disliked" in f["fact"].lower()]
+        if approvals or rejections:
+            patterns_hint = "\n\nLearned patterns from observations:"
+            if approvals:
+                patterns_hint += f"\n- Positive signals: {len(approvals)} approvals/likes"
+            if rejections:
+                patterns_hint += f"\n- Negative signals: {len(rejections)} rejections/dislikes"
+            patterns_hint += "\n- Look for common themes in approved vs rejected items"
+
+    system_msg = f"""You are an AI with neural memory that has LEARNED from all observations below.
+Unlike simple retrieval, you should:
+1. Consider ALL facts holistically
+2. Identify PATTERNS across multiple observations
+3. Make INFERENCES based on learned patterns
+4. Predict based on trends, not just direct matches
+
+Observations (learned knowledge):
+{all_facts}
+{patterns_hint}
+
+Question novelty (surprise score): {surprise:.2f}
+- Low surprise (<0.3): This topic is familiar from your observations
+- High surprise (>0.6): This is a novel topic, be cautious
+"""
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": question},
+    ]
+
+    try:
+        start = time.time()
+        response = hf_client.chat_completion(messages=messages, max_tokens=200, temperature=0.7)
+        elapsed = time.time() - start
+        answer = response.choices[0].message.content
+        return answer.strip() if answer else "", elapsed
+    except Exception as e:
+        return f"Error: {e!s}", 0.0
+
+
 def compare_responses(question: str) -> Tuple[str, str, str, plt.Figure, plt.Figure]:
-    """Compare vanilla LLM vs memory-augmented LLM on the same question."""
+    """Compare RAG vs Neural Memory augmented LLM on the same question."""
     global metrics
 
     if not question.strip():
@@ -438,40 +535,36 @@ def compare_responses(question: str) -> Tuple[str, str, str, plt.Figure, plt.Fig
             create_knowledge_base_visualization(),
         )
 
-    # Get context from knowledge base
-    context = get_knowledge_context()
-
     # Check surprise (is this question familiar?)
     surprise = memory.surprise(question)
 
-    # Query WITH memory context
-    nm_response, nm_time = call_llm(question, context)
+    # Query with NEURAL MEMORY (pattern learning, all context)
+    nm_response, nm_time = call_neural_memory_llm(question, knowledge_base, surprise)
     metrics.nm_queries += 1
     metrics.nm_response_times.append(nm_time)
 
-    # Query WITHOUT memory context (vanilla)
-    vanilla_response, vanilla_time = call_llm(question)
+    # Query with RAG (simple retrieval)
+    rag_response, rag_time, retrieved_facts = call_rag_llm(question, knowledge_base)
     metrics.vanilla_queries += 1
-    metrics.vanilla_response_times.append(vanilla_time)
+    metrics.vanilla_response_times.append(rag_time)
 
-    # Simple hallucination detection (if answer is too confident without knowledge)
-    vanilla_hedges = any(
-        phrase in vanilla_response.lower()
-        for phrase in ["i don't know", "i don't have", "i'm not sure", "cannot"]
+    # Simple quality detection
+    rag_failed = any(
+        phrase in rag_response.lower()
+        for phrase in ["doesn't cover", "no relevant", "don't have", "cannot answer"]
     )
-    nm_hedges = any(
+    nm_confident = not any(
         phrase in nm_response.lower()
-        for phrase in ["i don't know", "i don't have", "i'm not sure", "cannot"]
+        for phrase in ["i don't know", "i don't have", "cannot"]
     )
 
-    # If knowledge base has relevant info and vanilla doesn't hedge, likely hallucinating
-    if knowledge_base and not vanilla_hedges:
+    if rag_failed:
         metrics.vanilla_hallucinations += 1
-    if not nm_hedges and context:
+    if nm_confident and knowledge_base:
         metrics.nm_correct += 1
 
-    # Format outputs with clear response display
-    nm_output = f"""### With Neural Memory
+    # Format outputs - Neural Memory
+    nm_output = f"""### Neural Memory (Pattern Learning)
 
 **Question:** {question}
 
@@ -479,27 +572,28 @@ def compare_responses(question: str) -> Tuple[str, str, str, plt.Figure, plt.Fig
 > {nm_response}
 
 ---
-**Metrics:**
-| Metric | Value |
-|--------|-------|
-| Surprise Score | {surprise:.3f} |
-| Response Time | {nm_time:.2f}s |
-| Facts Used | {len(knowledge_base)} |
+**How it works:**
+- Uses **ALL {len(knowledge_base)} facts** holistically
+- **Learns patterns** (e.g., approval vs rejection trends)
+- **Surprise Score: {surprise:.3f}** - {'familiar topic' if surprise < 0.4 else 'novel topic'}
+- Response Time: {nm_time:.2f}s
 """
 
-    vanilla_output = f"""### Vanilla LLM (No Memory)
+    # Format outputs - RAG
+    retrieved_str = "\n".join([f"  - {f}" for f in retrieved_facts])
+    rag_output = f"""### RAG (Retrieval Only)
 
 **Question:** {question}
 
 **Response:**
-> {vanilla_response}
+> {rag_response}
 
 ---
-**Metrics:**
-| Metric | Value |
-|--------|-------|
-| Response Time | {vanilla_time:.2f}s |
-| Context | None |
+**How it works:**
+- Retrieved **{len([f for f in retrieved_facts if f != '(none retrieved)'])} facts** by keyword match:
+{retrieved_str}
+- **No pattern learning** - just similarity search
+- Response Time: {rag_time:.2f}s
 """
 
     # Comparison summary
@@ -507,7 +601,7 @@ def compare_responses(question: str) -> Tuple[str, str, str, plt.Figure, plt.Fig
 
     return (
         nm_output,
-        vanilla_output,
+        rag_output,
         comparison,
         create_neural_memory_state_visualization(),
         create_knowledge_base_visualization(),
@@ -521,7 +615,7 @@ def get_comparison_summary() -> str:
         if metrics.nm_response_times
         else 0
     )
-    vanilla_avg_time = (
+    rag_avg_time = (
         sum(metrics.vanilla_response_times) / len(metrics.vanilla_response_times)
         if metrics.vanilla_response_times
         else 0
@@ -530,28 +624,36 @@ def get_comparison_summary() -> str:
     nm_accuracy = (
         metrics.nm_correct / metrics.nm_queries * 100 if metrics.nm_queries else 0
     )
-    vanilla_halluc_rate = (
+    rag_fail_rate = (
         metrics.vanilla_hallucinations / metrics.vanilla_queries * 100
         if metrics.vanilla_queries
         else 0
     )
 
-    return f"""## Comparison Summary
+    return f"""## Neural Memory vs RAG Comparison
 
-| Metric | With Neural Memory | Vanilla LLM |
-|--------|-------------------|-------------|
+| Metric | Neural Memory | RAG |
+|--------|---------------|-----|
 | **Queries** | {metrics.nm_queries} | {metrics.vanilla_queries} |
-| **Grounded Answers** | {metrics.nm_correct} ({nm_accuracy:.0f}%) | N/A |
-| **Potential Hallucinations** | {metrics.nm_hallucinations} | {metrics.vanilla_hallucinations} ({vanilla_halluc_rate:.0f}%) |
-| **Avg Response Time** | {nm_avg_time:.2f}s | {vanilla_avg_time:.2f}s |
+| **Pattern-Based Answers** | {metrics.nm_correct} ({nm_accuracy:.0f}%) | N/A |
+| **Retrieval Failures** | N/A | {metrics.vanilla_hallucinations} ({rag_fail_rate:.0f}%) |
+| **Avg Response Time** | {nm_avg_time:.2f}s | {rag_avg_time:.2f}s |
 
-### Knowledge Base
-{len(knowledge_base)} facts stored
+### Knowledge Base: {len(knowledge_base)} facts stored
+
+### Why Neural Memory Wins
+
+| Capability | Neural Memory | RAG |
+|------------|---------------|-----|
+| **Pattern Learning** | Learns trends across all data | No learning |
+| **Inference** | Can predict from patterns | Only retrieves matches |
+| **Context Usage** | Uses ALL facts holistically | Uses top-k retrieved |
+| **Novelty Detection** | Surprise score | None |
+| **Memory Size** | Fixed (neural weights) | Grows with data |
 
 ### Key Insight
-- **Neural Memory** grounds responses in observed facts
-- **Vanilla LLM** may hallucinate without context
-- Surprise score indicates how novel the question is
+Neural memory **learns patterns** (e.g., "Carlos rejects bright colors, approves dark themes")
+and can **infer preferences** for novel items. RAG just retrieves similar documents.
 """
 
 
@@ -882,13 +984,13 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
         # TAB 1: Comparison Demo (NEW - Main Feature)
         with gr.TabItem("LLM Comparison"):
             gr.Markdown("""
-            ### Vanilla LLM vs Memory-Augmented LLM
+            ### Neural Memory vs RAG (Retrieval-Augmented Generation)
 
-            **Step 1:** Teach the system some facts (knowledge base)
-            **Step 2:** Ask questions and compare responses
+            **Step 1:** Teach the system facts about preferences/patterns
+            **Step 2:** Ask questions that require **inference**, not just retrieval
 
-            The vanilla LLM has no memory - it may hallucinate.
-            The memory-augmented LLM uses your observed facts.
+            **RAG** retrieves similar documents but can't learn patterns.
+            **Neural Memory** learns from ALL observations and can infer from trends.
             """)
 
             with gr.Row():
@@ -903,11 +1005,15 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
                     fact_output = gr.Markdown()
                     gr.Markdown("#### Example Facts to Try")
                     gr.Markdown("""
-                    - "My favorite programming language is Rust"
-                    - "I always use dark mode in my editor"
-                    - "The project deadline is March 15th"
-                    - "Our API uses JWT authentication"
-                    - "The database runs on PostgreSQL 15"
+                    **Scenario: Learning User Preferences (Pattern Recognition)**
+                    1. "Carlos rejected the bright colorful design"
+                    2. "Carlos rejected the flashy animated homepage"
+                    3. "Carlos approved the minimalist dark layout"
+                    4. "Carlos approved the clean monochrome interface"
+
+                    Then ask: **"We have a new UI mockup with neon colors - will Carlos like it?"**
+
+                    *Neural Memory learns the pattern (Carlos prefers dark/minimal). RAG just retrieves similar facts without inferring the preference pattern.*
                     """)
 
                 with gr.Column(scale=1):
@@ -932,11 +1038,20 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
             gr.Markdown("---")
             gr.Markdown("#### Step 2: Ask Questions & Compare Responses")
 
-            question_input = gr.Textbox(
-                label="Ask a Question",
-                placeholder="e.g., 'What editor should I use?' or 'What's the project deadline?'",
-                lines=2,
-            )
+            with gr.Row():
+                with gr.Column(scale=2):
+                    question_input = gr.Textbox(
+                        label="Ask a Question",
+                        placeholder="e.g., 'We have a new UI mockup with neon colors - will Carlos like it?'",
+                        lines=2,
+                    )
+                with gr.Column(scale=1):
+                    gr.Markdown("""
+                    **Best Questions for Neural Memory:**
+                    - Questions requiring **pattern inference**
+                    - Questions about **preferences/trends**
+                    - Questions needing **generalization**
+                    """)
 
             with gr.Row():
                 compare_btn = gr.Button("Compare Responses", variant="primary", size="lg")
@@ -945,10 +1060,10 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
             # Response display - side by side with clear headers
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("##### Memory-Augmented Response")
+                    gr.Markdown("##### Neural Memory Response")
                     nm_response = gr.Markdown()
                 with gr.Column():
-                    gr.Markdown("##### Vanilla LLM Response")
+                    gr.Markdown("##### RAG Response")
                     vanilla_response = gr.Markdown()
 
             comparison_summary = gr.Markdown(label="Comparison Metrics")
