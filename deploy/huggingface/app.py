@@ -29,8 +29,8 @@ matplotlib.use("Agg")
 # HUGGINGFACE INFERENCE CLIENT
 # =============================================================================
 
-# Use a free model - Mistral or Qwen work well
-HF_MODEL = os.getenv("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
+# Use a free model that supports chat completion
+HF_MODEL = os.getenv("HF_MODEL", "HuggingFaceH4/zephyr-7b-beta")
 HF_TOKEN = os.getenv("HF_TOKEN", None)  # Optional - works without for many models
 
 try:
