@@ -96,8 +96,16 @@ def get_embedding(text: str) -> np.ndarray:
         tensor = memory._encode_text(text)
         # Pass through memory network to get learned representation
         output = memory.memory_net(tensor)
-        # Return flattened representation
-        return output.cpu().numpy().flatten()
+        # Flatten and ensure fixed size (pad or truncate to 256)
+        flat = output.cpu().numpy().flatten()
+        target_size = 256
+        if len(flat) < target_size:
+            # Pad with zeros
+            flat = np.pad(flat, (0, target_size - len(flat)), mode='constant')
+        elif len(flat) > target_size:
+            # Truncate
+            flat = flat[:target_size]
+        return flat
 
 
 def create_tsne_visualization() -> plt.Figure:
