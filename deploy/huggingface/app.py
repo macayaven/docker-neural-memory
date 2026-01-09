@@ -42,8 +42,8 @@ except Exception as e:
     LLM_AVAILABLE = False
 
 # Add src to path for real implementation
+# When deployed to HF Spaces, src/ is copied to the same directory as app.py
 sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.config import MemoryConfig
 from src.memory.neural_memory import NeuralMemory
