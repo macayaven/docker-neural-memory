@@ -14,8 +14,6 @@ import torch
 
 from ..memory.consolidation import MemoryConsolidator
 from ..memory.neural_memory import NeuralMemory
-from ..state.checkpoint import CheckpointManager
-from ..state.versioning import VersionManager
 from .tools import TOOL_SCHEMAS
 
 logging.basicConfig(level=logging.INFO)
@@ -39,8 +37,6 @@ class NeuralMemoryServer:
         self.memory = NeuralMemory(dim=self.memory_dim)
         self.memory.lr.data = torch.tensor(self.learning_rate)
 
-        self.checkpoint_mgr = CheckpointManager()
-        self.version_mgr = VersionManager(self.checkpoint_mgr)
         self.consolidator = MemoryConsolidator()
 
         # Statistics tracking
@@ -167,61 +163,34 @@ class NeuralMemoryServer:
             self.memory.memory_net, [self._text_to_tensor("placeholder")]
         )
 
-    async def _handle_checkpoint(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_checkpoint(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle checkpoint tool call."""
-        tag = args["tag"]
-        description = args.get("description", "")
-
-        info = self.checkpoint_mgr.checkpoint(self.memory, tag, description)
-
+        # Checkpoint functionality removed - not needed for demo
         return {
-            "checkpoint_id": info.weight_hash,
-            "tag": info.tag,
-            "size_mb": info.size_mb,
-            "weight_hash": info.weight_hash,
+            "error": "Checkpoint functionality not available in this version",
+            "checkpoint_id": None,
         }
 
-    async def _handle_restore(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_restore(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle restore tool call."""
-        tag = args["tag"]
-
-        info = self.checkpoint_mgr.restore(self.memory, tag)
-        learning = self.version_mgr.learning_since_checkpoint(self.memory, tag)
-
+        # Restore functionality removed - not needed for demo
         return {
-            "restored": True,
-            "weight_hash": info.weight_hash,
-            "learning_since_checkpoint": learning.get("total_learning", 0),
+            "error": "Restore functionality not available in this version",
+            "restored": False,
         }
 
-    async def _handle_fork(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_fork(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle fork tool call."""
-        source_tag = args["source_tag"]
-        new_tag = args["new_tag"]
-
-        info = self.version_mgr.fork(self.memory, source_tag, new_tag)
-
+        # Fork functionality removed - not needed for demo
         return {
-            "forked": info.forked,
-            "source_hash": info.source_hash,
-            "new_hash": info.new_hash,
+            "error": "Fork functionality not available in this version",
+            "forked": False,
         }
 
     async def _handle_list_checkpoints(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle list_checkpoints tool call."""
-        checkpoints = self.checkpoint_mgr.list_checkpoints()
-
-        return {
-            "checkpoints": [
-                {
-                    "tag": cp.tag,
-                    "created_at": cp.created_at,
-                    "size_mb": cp.size_mb,
-                    "description": cp.description,
-                }
-                for cp in checkpoints
-            ]
-        }
+        # List checkpoints functionality removed - not needed for demo
+        return {"checkpoints": []}
 
     async def _handle_stats(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle stats tool call."""
