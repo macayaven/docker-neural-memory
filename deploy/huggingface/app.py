@@ -93,7 +93,7 @@ def get_embedding(text: str) -> np.ndarray:
     """Get the neural memory's internal representation of text."""
     with torch.no_grad():
         # Convert text to tensor using memory's encoding
-        tensor = memory._text_to_tensor(text)
+        tensor = memory._encode_text(text)
         # Pass through memory network to get learned representation
         output = memory.memory_net(tensor)
         # Return flattened representation
