@@ -29,8 +29,9 @@ matplotlib.use("Agg")
 # HUGGINGFACE INFERENCE CLIENT
 # =============================================================================
 
-# Use a free model that supports chat completion on HF Serverless Inference
-HF_MODEL = os.getenv("HF_MODEL", "microsoft/Phi-3.5-mini-instruct")
+# Use a model that is available on HF Serverless Inference free tier
+# See: https://huggingface.co/models?inference_provider=hf-inference&pipeline_tag=text-generation
+HF_MODEL = os.getenv("HF_MODEL", "HuggingFaceTB/SmolLM3-3B")
 HF_TOKEN = os.getenv("HF_TOKEN", None)  # Optional - works without for many models
 
 try:
