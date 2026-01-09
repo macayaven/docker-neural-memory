@@ -921,6 +921,540 @@ volumes:
 *This project demonstrates production-grade AI infrastructure with Docker.*
 """
 
+# =============================================================================
+# ARCHITECTURE DIAGRAMS (How It Works)
+# =============================================================================
+
+ARCHITECTURE_INTRO_MD = """
+## How It Works: Neural Memory vs RAG Architecture
+
+This section provides a detailed look at how both systems process information and connect to the LLM.
+The diagrams below are **faithful representations of our actual implementation**.
+
+---
+"""
+
+NEURAL_MEMORY_DIAGRAM_HTML = """
+<div style="font-family: system-ui, -apple-system, sans-serif; padding: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; color: #fff;">
+    <h3 style="text-align: center; color: #00d4ff; margin-bottom: 30px; font-size: 1.5em;">
+        Neural Memory Pipeline (Test-Time Training)
+    </h3>
+
+    <!-- Main Flow -->
+    <div style="display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto;">
+
+        <!-- Phase 1: Learning Phase -->
+        <div style="background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; border-radius: 12px; padding: 20px;">
+            <h4 style="color: #00d4ff; margin: 0 0 15px 0;">Phase 1: Learning (When Facts Are Added)</h4>
+
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;">
+                <!-- Input -->
+                <div style="background: #2d3748; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 120px;">
+                    <div style="font-size: 24px;">📝</div>
+                    <div style="font-weight: bold; color: #fff;">User Fact</div>
+                    <div style="font-size: 11px; color: #a0aec0;">"Carlos rejected<br/>bright colors"</div>
+                </div>
+
+                <div style="color: #00d4ff; font-size: 24px;">→</div>
+
+                <!-- Encode -->
+                <div style="background: #553c9a; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 140px;">
+                    <div style="font-size: 24px;">🔢</div>
+                    <div style="font-weight: bold; color: #fff;">_encode_text()</div>
+                    <div style="font-size: 11px; color: #d6bcfa;">Tensor [1, 64, 256]</div>
+                </div>
+
+                <div style="color: #00d4ff; font-size: 24px;">→</div>
+
+                <!-- Forward Pass -->
+                <div style="background: #2f855a; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 140px;">
+                    <div style="font-size: 24px;">🧠</div>
+                    <div style="font-weight: bold; color: #fff;">memory_net(x)</div>
+                    <div style="font-size: 11px; color: #9ae6b4;">2-layer MLP<br/>~250K params</div>
+                </div>
+
+                <div style="color: #00d4ff; font-size: 24px;">→</div>
+
+                <!-- Compute Loss -->
+                <div style="background: #c53030; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 140px;">
+                    <div style="font-size: 24px;">📊</div>
+                    <div style="font-weight: bold; color: #fff;">MSE Loss</div>
+                    <div style="font-size: 11px; color: #feb2b2;">Surprise Score<br/>= Prediction Error</div>
+                </div>
+
+                <div style="color: #00d4ff; font-size: 24px;">→</div>
+
+                <!-- Gradient Descent -->
+                <div style="background: #d69e2e; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 160px; border: 3px solid #faf089;">
+                    <div style="font-size: 24px;">⚡</div>
+                    <div style="font-weight: bold; color: #1a202c;">WEIGHT UPDATE</div>
+                    <div style="font-size: 11px; color: #744210;">torch.autograd.grad()<br/>param -= lr × grad</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 12px; color: #a0aec0;">
+                <strong style="color: #00d4ff;">Key Point:</strong> The neural network's weights physically change after each fact.
+                This is real gradient descent happening at inference time (Test-Time Training / Titans architecture).
+            </div>
+        </div>
+
+        <!-- Phase 2: Query Phase -->
+        <div style="background: rgba(72, 187, 120, 0.1); border: 2px solid #48bb78; border-radius: 12px; padding: 20px;">
+            <h4 style="color: #48bb78; margin: 0 0 15px 0;">Phase 2: Query (When Questions Are Asked)</h4>
+
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;">
+                <!-- Question -->
+                <div style="background: #2d3748; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 120px;">
+                    <div style="font-size: 24px;">❓</div>
+                    <div style="font-weight: bold; color: #fff;">Question</div>
+                    <div style="font-size: 11px; color: #a0aec0;">"Will Carlos<br/>like neon?"</div>
+                </div>
+
+                <div style="color: #48bb78; font-size: 24px;">→</div>
+
+                <!-- Surprise Check -->
+                <div style="background: #553c9a; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 130px;">
+                    <div style="font-size: 24px;">🎯</div>
+                    <div style="font-weight: bold; color: #fff;">surprise()</div>
+                    <div style="font-size: 11px; color: #d6bcfa;">Novelty Score<br/>(No Learning)</div>
+                </div>
+
+                <div style="color: #48bb78; font-size: 24px;">→</div>
+
+                <!-- Context Builder -->
+                <div style="background: #2f855a; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 160px;">
+                    <div style="font-size: 24px;">📦</div>
+                    <div style="font-weight: bold; color: #fff;">Build Context</div>
+                    <div style="font-size: 11px; color: #9ae6b4;"><strong>ALL facts</strong><br/>+ Pattern hints<br/>+ Surprise score</div>
+                </div>
+
+                <div style="color: #48bb78; font-size: 24px;">→</div>
+
+                <!-- System Prompt -->
+                <div style="background: #3182ce; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 180px;">
+                    <div style="font-size: 24px;">💬</div>
+                    <div style="font-weight: bold; color: #fff;">System Prompt</div>
+                    <div style="font-size: 10px; color: #bee3f8; text-align: left; margin-top: 5px;">
+                        "You have LEARNED from:<br/>
+                        • All 4 observations<br/>
+                        • Identify PATTERNS<br/>
+                        • Make INFERENCES"
+                    </div>
+                </div>
+
+                <div style="color: #48bb78; font-size: 24px;">→</div>
+
+                <!-- LLM -->
+                <div style="background: linear-gradient(135deg, #805ad5 0%, #553c9a 100%); padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 140px; border: 3px solid #d6bcfa;">
+                    <div style="font-size: 24px;">🤖</div>
+                    <div style="font-weight: bold; color: #fff;">LLM</div>
+                    <div style="font-size: 11px; color: #e9d8fd;">SmolLM3-3B<br/>(HuggingFace)</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 12px; color: #a0aec0;">
+                <strong style="color: #48bb78;">Key Point:</strong> The LLM receives ALL facts + learned pattern hints + novelty indicator.
+                It's instructed to identify patterns and make inferences, not just retrieve.
+            </div>
+        </div>
+
+    </div>
+</div>
+"""
+
+RAG_DIAGRAM_HTML = """
+<div style="font-family: system-ui, -apple-system, sans-serif; padding: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; color: #fff; margin-top: 20px;">
+    <h3 style="text-align: center; color: #fc8181; margin-bottom: 30px; font-size: 1.5em;">
+        RAG Pipeline (Retrieval-Augmented Generation)
+    </h3>
+
+    <!-- Main Flow -->
+    <div style="display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto;">
+
+        <!-- Phase 1: Storage Phase -->
+        <div style="background: rgba(252, 129, 129, 0.1); border: 2px solid #fc8181; border-radius: 12px; padding: 20px;">
+            <h4 style="color: #fc8181; margin: 0 0 15px 0;">Phase 1: Storage (When Facts Are Added)</h4>
+
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;">
+                <!-- Input -->
+                <div style="background: #2d3748; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 120px;">
+                    <div style="font-size: 24px;">📝</div>
+                    <div style="font-weight: bold; color: #fff;">User Fact</div>
+                    <div style="font-size: 11px; color: #a0aec0;">"Carlos rejected<br/>bright colors"</div>
+                </div>
+
+                <div style="color: #fc8181; font-size: 24px;">→</div>
+
+                <!-- Append to List -->
+                <div style="background: #744210; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 180px;">
+                    <div style="font-size: 24px;">📋</div>
+                    <div style="font-weight: bold; color: #fff;">knowledge_base.append()</div>
+                    <div style="font-size: 11px; color: #faf089;">Simple list storage<br/>No transformation</div>
+                </div>
+
+                <div style="color: #fc8181; font-size: 24px;">→</div>
+
+                <!-- Storage -->
+                <div style="background: #2d3748; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 140px; border: 2px dashed #a0aec0;">
+                    <div style="font-size: 24px;">🗃️</div>
+                    <div style="font-weight: bold; color: #fff;">Document Store</div>
+                    <div style="font-size: 11px; color: #a0aec0;">List of strings<br/>Grows with data</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 12px; color: #a0aec0;">
+                <strong style="color: #fc8181;">Key Point:</strong> Facts are simply stored as-is. <strong>No learning occurs.</strong>
+                The system doesn't understand relationships or patterns between facts.
+            </div>
+        </div>
+
+        <!-- Phase 2: Retrieval Phase -->
+        <div style="background: rgba(237, 137, 54, 0.1); border: 2px solid #ed8936; border-radius: 12px; padding: 20px;">
+            <h4 style="color: #ed8936; margin: 0 0 15px 0;">Phase 2: Query (When Questions Are Asked)</h4>
+
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center;">
+                <!-- Question -->
+                <div style="background: #2d3748; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 120px;">
+                    <div style="font-size: 24px;">❓</div>
+                    <div style="font-weight: bold; color: #fff;">Question</div>
+                    <div style="font-size: 11px; color: #a0aec0;">"Will Carlos<br/>like neon?"</div>
+                </div>
+
+                <div style="color: #ed8936; font-size: 24px;">→</div>
+
+                <!-- Tokenize -->
+                <div style="background: #553c9a; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 130px;">
+                    <div style="font-size: 24px;">✂️</div>
+                    <div style="font-weight: bold; color: #fff;">Tokenize</div>
+                    <div style="font-size: 11px; color: #d6bcfa;">Split into words<br/>{"will", "carlos",<br/>"like", "neon"}</div>
+                </div>
+
+                <div style="color: #ed8936; font-size: 24px;">→</div>
+
+                <!-- Keyword Match -->
+                <div style="background: #c53030; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 160px;">
+                    <div style="font-size: 24px;">🔍</div>
+                    <div style="font-weight: bold; color: #fff;">Keyword Overlap</div>
+                    <div style="font-size: 11px; color: #feb2b2;">Count matching words<br/>between Q and each fact</div>
+                </div>
+
+                <div style="color: #ed8936; font-size: 24px;">→</div>
+
+                <!-- Top-K -->
+                <div style="background: #744210; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 130px; border: 3px solid #faf089;">
+                    <div style="font-size: 24px;">🏆</div>
+                    <div style="font-weight: bold; color: #fff;">Top-2 Facts</div>
+                    <div style="font-size: 11px; color: #faf089;">Only highest<br/>overlap scores</div>
+                </div>
+
+                <div style="color: #ed8936; font-size: 24px;">→</div>
+
+                <!-- System Prompt -->
+                <div style="background: #3182ce; padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 180px;">
+                    <div style="font-size: 24px;">💬</div>
+                    <div style="font-weight: bold; color: #fff;">System Prompt</div>
+                    <div style="font-size: 10px; color: #bee3f8; text-align: left; margin-top: 5px;">
+                        "You are a RAG system.<br/>
+                        ONLY use retrieved facts.<br/>
+                        If not covered, say so."
+                    </div>
+                </div>
+
+                <div style="color: #ed8936; font-size: 24px;">→</div>
+
+                <!-- LLM -->
+                <div style="background: linear-gradient(135deg, #805ad5 0%, #553c9a 100%); padding: 15px 20px; border-radius: 8px; text-align: center; min-width: 140px; border: 3px solid #d6bcfa;">
+                    <div style="font-size: 24px;">🤖</div>
+                    <div style="font-weight: bold; color: #fff;">LLM</div>
+                    <div style="font-size: 11px; color: #e9d8fd;">SmolLM3-3B<br/>(Same model!)</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 12px; color: #a0aec0;">
+                <strong style="color: #ed8936;">Key Point:</strong> The LLM only sees 2 retrieved facts (not all 4).
+                "neon" ≠ "bright" keyword-wise, so relevant facts may not be retrieved!
+            </div>
+        </div>
+
+    </div>
+</div>
+"""
+
+LLM_INTEGRATION_MD = """
+---
+
+## How Each System Connects to the LLM
+
+Both systems use the **exact same LLM** (HuggingFace SmolLM3-3B). The difference is **what context they provide**.
+
+### Neural Memory → LLM Connection
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    SYSTEM PROMPT (Neural Memory)                      │
+├─────────────────────────────────────────────────────────────────────┤
+│ "You are an AI with neural memory that has LEARNED from all         │
+│  observations below. Unlike simple retrieval, you should:           │
+│                                                                      │
+│  1. Consider ALL facts holistically                                  │
+│  2. Identify PATTERNS across multiple observations                   │
+│  3. Make INFERENCES based on learned patterns                        │
+│  4. Predict based on trends, not just direct matches                 │
+│                                                                      │
+│  Observations (learned knowledge):                                   │
+│  - Carlos rejected the bright colorful design                        │
+│  - Carlos rejected the flashy animated homepage                      │
+│  - Carlos approved the minimalist dark layout                        │
+│  - Carlos approved the clean monochrome interface                    │
+│                                                                      │
+│  Learned patterns from observations:                                 │
+│  - Positive signals: 2 approvals                                     │
+│  - Negative signals: 2 rejections                                    │
+│  - Look for common themes in approved vs rejected items              │
+│                                                                      │
+│  Question novelty (surprise score): 0.89                             │
+│  - High surprise (>0.6): This is a novel topic, be cautious"         │
+├─────────────────────────────────────────────────────────────────────┤
+│ USER: "We have a new UI mockup with neon colors - will Carlos       │
+│        like it?"                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**What the Neural Memory provides:**
+| Component | Purpose |
+|-----------|---------|
+| **ALL facts** | Complete context for holistic reasoning |
+| **Pattern hints** | Extracted approval/rejection counts |
+| **Surprise score** | Indicates if question is familiar or novel |
+| **Inference instructions** | Tells LLM to identify patterns and predict |
+
+---
+
+### RAG → LLM Connection
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                       SYSTEM PROMPT (RAG)                            │
+├─────────────────────────────────────────────────────────────────────┤
+│ "You are a RAG system. You can ONLY use the retrieved facts below   │
+│  to answer. If the retrieved facts don't directly answer the        │
+│  question, say 'The retrieved information doesn't cover this.'      │
+│                                                                      │
+│  Retrieved facts:                                                    │
+│  - Carlos rejected the bright colorful design                        │
+│  (Only 1 fact retrieved - 'neon' didn't match other keywords!)      │
+├─────────────────────────────────────────────────────────────────────┤
+│ USER: "We have a new UI mockup with neon colors - will Carlos       │
+│        like it?"                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**What RAG provides:**
+| Component | Purpose |
+|-----------|---------|
+| **Top-2 facts only** | Limited context based on keyword overlap |
+| **No pattern info** | System doesn't analyze relationships |
+| **No novelty signal** | No indication of question familiarity |
+| **Strict retrieval instructions** | Tells LLM to only use retrieved facts |
+
+---
+
+## The Critical Difference: What Goes Into the LLM
+
+"""
+
+COMPARISON_TABLE_HTML = """
+<div style="font-family: system-ui, -apple-system, sans-serif; padding: 20px; background: #1a1a2e; border-radius: 16px; color: #fff; margin: 20px 0;">
+    <h3 style="text-align: center; color: #fff; margin-bottom: 20px;">Side-by-Side: What the LLM Receives</h3>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- Neural Memory Column -->
+        <div style="background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; border-radius: 12px; padding: 20px;">
+            <h4 style="color: #00d4ff; text-align: center; margin: 0 0 15px 0;">🧠 Neural Memory</h4>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: #48bb78; font-weight: bold; margin-bottom: 8px;">✅ Facts Provided:</div>
+                <div style="font-size: 13px; color: #a0aec0;">ALL 4 facts (complete knowledge)</div>
+            </div>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: #48bb78; font-weight: bold; margin-bottom: 8px;">✅ Pattern Analysis:</div>
+                <div style="font-size: 13px; color: #a0aec0;">
+                    • 2 approvals identified<br/>
+                    • 2 rejections identified<br/>
+                    • "Look for common themes"
+                </div>
+            </div>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: #48bb78; font-weight: bold; margin-bottom: 8px;">✅ Novelty Signal:</div>
+                <div style="font-size: 13px; color: #a0aec0;">Surprise score: 0.89 (novel topic)</div>
+            </div>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px;">
+                <div style="color: #48bb78; font-weight: bold; margin-bottom: 8px;">✅ Instructions:</div>
+                <div style="font-size: 13px; color: #a0aec0;">
+                    "Identify PATTERNS"<br/>
+                    "Make INFERENCES"<br/>
+                    "Predict based on trends"
+                </div>
+            </div>
+        </div>
+
+        <!-- RAG Column -->
+        <div style="background: rgba(252, 129, 129, 0.1); border: 2px solid #fc8181; border-radius: 12px; padding: 20px;">
+            <h4 style="color: #fc8181; text-align: center; margin: 0 0 15px 0;">📚 RAG</h4>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: #fc8181; font-weight: bold; margin-bottom: 8px;">⚠️ Facts Provided:</div>
+                <div style="font-size: 13px; color: #a0aec0;">Only 1-2 facts (keyword match)<br/>
+                <span style="color: #fc8181; font-size: 11px;">"neon" ≠ "bright", "colorful", etc.</span></div>
+            </div>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: #fc8181; font-weight: bold; margin-bottom: 8px;">❌ Pattern Analysis:</div>
+                <div style="font-size: 13px; color: #a0aec0;">None - no relationship detection</div>
+            </div>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: #fc8181; font-weight: bold; margin-bottom: 8px;">❌ Novelty Signal:</div>
+                <div style="font-size: 13px; color: #a0aec0;">None - no familiarity indicator</div>
+            </div>
+
+            <div style="background: #2d3748; border-radius: 8px; padding: 15px;">
+                <div style="color: #fc8181; font-weight: bold; margin-bottom: 8px;">⚠️ Instructions:</div>
+                <div style="font-size: 13px; color: #a0aec0;">
+                    "ONLY use retrieved facts"<br/>
+                    "If not covered, say so"<br/>
+                    <span style="color: #fc8181; font-size: 11px;">No inference allowed</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+"""
+
+ARCHITECTURE_SUMMARY_MD = """
+---
+
+## Why This Architecture Matters
+
+### The Learning Advantage
+
+| Aspect | Neural Memory | RAG |
+|--------|---------------|-----|
+| **Storage** | Fixed neural weights (~250K params) | Growing document store |
+| **Learning** | Yes - weights update per observation | No - just stores text |
+| **Retrieval** | Not needed - patterns in weights | Required - keyword matching |
+| **Inference** | Can generalize to novel queries | Limited to direct matches |
+| **Memory Size** | Constant (doesn't grow) | Linear growth with data |
+
+### When Neural Memory Wins
+
+The architecture shines when:
+1. **Pattern Recognition Required** - "Carlos likes X, dislikes Y" → predict for Z
+2. **Novel Queries** - Question keywords don't match stored facts
+3. **Holistic Reasoning** - Answer requires synthesizing multiple facts
+4. **Bounded Memory** - Can't afford growing storage
+
+### When RAG Might Be Better
+
+RAG is simpler when:
+1. **Exact Retrieval** - "What did the document say about X?"
+2. **Large Corpus** - Millions of documents to search
+3. **No Patterns** - Facts are independent, not related
+4. **Transparency** - Need to cite exact source documents
+
+---
+
+## Technical Implementation Details
+
+### Neural Memory Architecture
+
+```
+Input Text
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  _encode_text(text)                          │
+│  ┌─────────────────────────────────────────┐ │
+│  │ 1. Convert to ASCII ordinals            │ │
+│  │ 2. Pad/truncate to max_seq_len (64)     │ │
+│  │ 3. Project to dimension (256)           │ │
+│  │ 4. Output: Tensor [1, 64, 256]          │ │
+│  └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  memory_net (nn.Sequential)                  │
+│  ┌─────────────────────────────────────────┐ │
+│  │ Linear(256 → 1024)                      │ │
+│  │ GELU activation                         │ │
+│  │ LayerNorm(1024)                         │ │
+│  │ Linear(1024 → 256)                      │ │
+│  └─────────────────────────────────────────┘ │
+│  Total: ~262K parameters                     │
+└─────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  _compute_surprise_tensor(input, output)     │
+│  ┌─────────────────────────────────────────┐ │
+│  │ loss = MSE(output, target)              │ │
+│  │ surprise = sigmoid(loss) scaled to 0-1  │ │
+│  └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  _update_weights(loss) [IF learn=True]       │
+│  ┌─────────────────────────────────────────┐ │
+│  │ grads = torch.autograd.grad(loss, θ)    │ │
+│  │ for each (param, grad):                 │ │
+│  │     param -= learning_rate × grad       │ │
+│  └─────────────────────────────────────────┘ │
+│  ⚡ This is the key innovation!              │
+└─────────────────────────────────────────────┘
+```
+
+### RAG Architecture (Simplified for Demo)
+
+```
+Input Text
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  knowledge_base.append({"fact": text, ...})  │
+│  Simple list storage - no transformation     │
+└─────────────────────────────────────────────┘
+
+Query
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  Keyword Overlap Scoring                     │
+│  ┌─────────────────────────────────────────┐ │
+│  │ question_words = set(query.split())     │ │
+│  │ for fact in knowledge_base:             │ │
+│  │     fact_words = set(fact.split())      │ │
+│  │     score = len(question_words ∩ fact_  │ │
+│  │              words)                      │ │
+│  └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  Top-K Selection (K=2 in our demo)           │
+│  Return facts with highest overlap scores    │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+*These diagrams represent the actual implementation in this demo. The code is open source.*
+"""
+
 ABOUT_MD = """
 ## About This Project
 
@@ -1078,7 +1612,26 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
                 outputs=[comparison_summary, tsne_plot, neural_state_plot, kb_plot]
             )
 
-        # TAB 2: Live Demo (original)
+        # TAB 2: How It Works (Architecture Diagrams)
+        with gr.TabItem("How It Works"):
+            gr.Markdown(ARCHITECTURE_INTRO_MD)
+
+            # Neural Memory Diagram
+            gr.HTML(NEURAL_MEMORY_DIAGRAM_HTML)
+
+            # RAG Diagram
+            gr.HTML(RAG_DIAGRAM_HTML)
+
+            # LLM Integration Explanation
+            gr.Markdown(LLM_INTEGRATION_MD)
+
+            # Side-by-side comparison table
+            gr.HTML(COMPARISON_TABLE_HTML)
+
+            # Architecture Summary
+            gr.Markdown(ARCHITECTURE_SUMMARY_MD)
+
+        # TAB 3: Neural Memory Playground (original Live Demo)
         with gr.TabItem("Neural Memory Playground"):
             gr.Markdown("### Watch Real Neural Learning")
 
@@ -1124,11 +1677,11 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
             reset_output = gr.Markdown()
             reset_btn.click(reset_memory, outputs=[reset_output])
 
-        # TAB 2: Docker Integration
+        # TAB 4: Docker Integration
         with gr.TabItem("Docker Integration"):
             gr.Markdown(DOCKER_INTEGRATION_MD)
 
-        # TAB 3: About
+        # TAB 5: About
         with gr.TabItem("About"):
             gr.Markdown(ABOUT_MD)
 
