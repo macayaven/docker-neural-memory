@@ -218,7 +218,7 @@ HEADER_HTML = '''
                     margin: 5px 0 0 0;
                     font-size: 1.1em;
                     font-weight: 300;
-                ">Real Test-Time Training — Not a Simulation</p>
+                ">Test-Time Training: Evolving LLMs from data hoarders to knowledge creators</p>
             </div>
         </div>
 
@@ -2137,24 +2137,69 @@ it learns patterns by updating weights during inference.
 - **Checkpoints**: Save/restore learned state via Docker volumes
 - **Container-Native**: Designed for orchestrated deployment
 
-### Built By
+---
+
+## Limitations
+
+This is a **demonstration project**, not a production-ready system:
+
+| Component | Current State | Production Would Need |
+|-----------|---------------|----------------------|
+| **RAG Implementation** | Simplified keyword matching | Vector embeddings + semantic search (FAISS, Pinecone) |
+| **Neural Memory** | Basic 2-layer MLP | Deeper architecture, attention mechanisms |
+| **Scalability** | Single-user demo | Distributed inference, GPU optimization |
+| **Evaluation** | Qualitative comparison | Benchmarks, ablation studies, metrics |
+| **Memory Capacity** | ~250K parameters | Larger models, hierarchical memory |
+
+The RAG comparison uses simple word overlap scoring to demonstrate *why* keyword-based retrieval fails for pattern inference. A production RAG system would use proper embeddings and vector similarity search.
+
+---
+
+## Acknowledgments
+
+This project builds on the work of brilliant researchers:
+
+**Core Research:**
+- **Titans: Learning to Memorize at Test Time** (Google, Dec 2024) — [arXiv:2501.00663](https://arxiv.org/abs/2501.00663)
+  - Ali Behrouz, Peilin Zhong, Vahab Mirrokni
+- **Learning to (Learn at Test Time): RNNs with Expressive Hidden States** (Stanford/Meta, Jul 2024) — [arXiv:2407.04620](https://arxiv.org/abs/2407.04620)
+  - Yu Sun, Xinhao Li, Karan Dalal, et al.
+
+**Frameworks & Tools:**
+- [PyTorch](https://pytorch.org/) — The foundation for neural memory implementation
+- [Gradio](https://gradio.app/) — Interactive demo interface
+- [HuggingFace](https://huggingface.co/) — Model hosting and inference API
+- [Model Context Protocol](https://modelcontextprotocol.io/) — Claude Desktop integration
+
+**Inspiration:**
+- The broader ML community exploring alternatives to attention-based memory
+- Open-source contributors who make research accessible
+
+---
+
+## Next Steps
+
+Potential improvements for future iterations:
+
+1. **Real RAG Baseline**: Integrate sentence-transformers + FAISS for proper semantic retrieval comparison
+2. **Attention-Based Memory**: Implement the full Titans architecture with neural long-term memory gates
+3. **Benchmarking**: Add quantitative evaluation on standard memory tasks (bAbI, etc.)
+4. **Multi-Modal Support**: Extend to image/audio observations
+5. **Distributed Memory**: Explore memory sharing across multiple agents
+6. **Fine-Grained Forgetting**: Implement selective memory consolidation/pruning
+
+---
+
+## Built By
 
 **Carlos Crespo Macaya**
-AI Engineer - GenAI Systems & Applied MLOps
-
-- 10+ years production ML experience
-- Expert in Docker, Kubernetes, MCP servers
-- Currently at HP AICoE building multi-agent systems
+AI Engineer — GenAI Systems & Applied MLOps
 
 This project demonstrates the ability to:
 1. Read cutting-edge research (Titans paper)
 2. Implement it correctly (PyTorch TTT)
 3. Productionize it (Docker, MCP, CI/CD)
-4. Make it compelling (this demo)
-
-**Contact:** [macayaven@gmail.com](mailto:macayaven@gmail.com)
-
-**GitHub:** [macayaven/docker-neural-memory](https://github.com/macayaven/docker-neural-memory)
+4. Communicate it effectively (this demo)
 """
 
 
