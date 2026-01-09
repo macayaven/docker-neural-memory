@@ -163,7 +163,7 @@ class NeuralMemoryServer:
             self.memory.memory_net, [self._text_to_tensor("placeholder")]
         )
 
-    async def _handle_checkpoint(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_checkpoint(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle checkpoint tool call."""
         # Checkpoint functionality removed - not needed for demo
         return {
@@ -171,7 +171,7 @@ class NeuralMemoryServer:
             "checkpoint_id": None,
         }
 
-    async def _handle_restore(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_restore(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle restore tool call."""
         # Restore functionality removed - not needed for demo
         return {
@@ -179,7 +179,7 @@ class NeuralMemoryServer:
             "restored": False,
         }
 
-    async def _handle_fork(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_fork(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Handle fork tool call."""
         # Fork functionality removed - not needed for demo
         return {
