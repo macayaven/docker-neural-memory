@@ -7,8 +7,9 @@ Like `docker commit` but for neural memory weights.
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -89,7 +90,7 @@ class CheckpointManager:
 
         info = CheckpointInfo(
             tag=tag,
-            created_at=datetime.now(UTC).isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
             size_mb=round(size_mb, 2),
             weight_hash=weight_hash,
             description=description,
@@ -136,7 +137,7 @@ class CheckpointManager:
             description=meta.get("description", ""),
         )
 
-    def list_checkpoints(self) -> list[CheckpointInfo]:
+    def list_checkpoints(self) -> List[CheckpointInfo]:
         """List all available checkpoints."""
         checkpoints = []
         for tag, meta in self.metadata["checkpoints"].items():

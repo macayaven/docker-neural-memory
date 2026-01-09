@@ -6,6 +6,8 @@ Uses Pydantic Settings for environment variable management.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -53,7 +55,7 @@ class TTTConfig(BaseSettings):
         default="mlp",
         description="TTT variant: 'linear' or 'mlp'",
     )
-    hidden_dim: int | None = Field(
+    hidden_dim: Optional[int] = Field(
         default=None,
         description="Hidden dimension (default: dim * 2)",
     )

@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -61,9 +61,9 @@ class ExperimentResult:
 
     test_id: str
     passed: bool
-    metrics: dict[str, Any]
+    metrics: Dict[str, Any]
     duration_ms: float
-    error: str | None = None
+    error: Optional[str] = None
 
 
 class ExperimentRunner:
@@ -76,9 +76,9 @@ class ExperimentRunner:
             learning_rate=config.learning_rate,
             device=config.device,
         )
-        self.memory: NeuralMemory | None = None
-        self.langfuse: Langfuse | None = None
-        self.results: list[ExperimentResult] = []
+        self.memory: Optional[NeuralMemory] = None
+        self.langfuse: Optional[Langfuse] = None
+        self.results: List[ExperimentResult] = []
 
         # Initialize Langfuse if available and requested
         if config.use_langfuse and LANGFUSE_AVAILABLE:
@@ -93,7 +93,7 @@ class ExperimentRunner:
         """Create a fresh memory instance."""
         self.memory = NeuralMemory(self.memory_config)
 
-    def _create_trace(self, name: str, metadata: dict | None = None) -> Any:
+    def _create_trace(self, name: str, metadata: Optional[dict] = None) -> Any:
         """Create a Langfuse trace if available."""
         if self.langfuse:
             return self.langfuse.trace(
@@ -108,7 +108,7 @@ class ExperimentRunner:
         if trace and self.langfuse:
             trace.score(name=name, value=value, comment=comment)
 
-    def run_learning_suite(self) -> list[ExperimentResult]:
+    def run_learning_suite(self) -> List[ExperimentResult]:
         """Run learning verification tests."""
         dataset_path = Path("experiments/datasets/learning.json")
         with dataset_path.open() as f:
@@ -130,7 +130,7 @@ class ExperimentRunner:
         trace = self._create_trace(f"learning/{test_id}", {"test": test})
 
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = {"surprises": [], "weight_deltas": []}
+        metrics: Dict[str, Any] = {"surprises": [], "weight_deltas": []}
         passed = True
         error = None
 
@@ -233,7 +233,7 @@ class ExperimentRunner:
             error=error,
         )
 
-    def run_retention_suite(self) -> list[ExperimentResult]:
+    def run_retention_suite(self) -> List[ExperimentResult]:
         """Run retention verification tests."""
         dataset_path = Path("experiments/datasets/retention.json")
         with dataset_path.open() as f:
@@ -255,7 +255,7 @@ class ExperimentRunner:
         trace = self._create_trace(f"retention/{test_id}", {"test": test})
 
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = {}
+        metrics: Dict[str, Any] = {}
         passed = True
         error = None
 
@@ -316,7 +316,7 @@ class ExperimentRunner:
             error=error,
         )
 
-    def run_generalization_suite(self) -> list[ExperimentResult]:
+    def run_generalization_suite(self) -> List[ExperimentResult]:
         """Run generalization verification tests."""
         dataset_path = Path("experiments/datasets/generalization.json")
         with dataset_path.open() as f:
@@ -338,7 +338,7 @@ class ExperimentRunner:
         trace = self._create_trace(f"generalization/{test_id}", {"test": test})
 
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = {}
+        metrics: Dict[str, Any] = {}
         passed = True
         error = None
 
@@ -448,7 +448,7 @@ class ExperimentRunner:
             error=error,
         )
 
-    def run_capacity_suite(self) -> list[ExperimentResult]:
+    def run_capacity_suite(self) -> List[ExperimentResult]:
         """Run capacity stress tests."""
         dataset_path = Path("experiments/datasets/capacity.json")
         with dataset_path.open() as f:
@@ -482,7 +482,7 @@ class ExperimentRunner:
         trace = self._create_trace(f"capacity/{test_id}", {"test": test})
 
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = {"scaling_results": []}
+        metrics: Dict[str, Any] = {"scaling_results": []}
         passed = True
         error = None
 
@@ -599,7 +599,7 @@ class ExperimentRunner:
         trace = self._create_trace(f"capacity/{test_id}", {"test": test})
 
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = {}
+        metrics: Dict[str, Any] = {}
         passed = True
         error = None
 
@@ -657,7 +657,7 @@ class ExperimentRunner:
         trace = self._create_trace(f"capacity/{test_id}", {"test": test})
 
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = {}
+        metrics: Dict[str, Any] = {}
         passed = True
         error = None
 
@@ -691,7 +691,7 @@ class ExperimentRunner:
         trace = self._create_trace(f"capacity/{test_id}", {"test": test})
 
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = {"dimension_results": []}
+        metrics: Dict[str, Any] = {"dimension_results": []}
         passed = True
         error = None
 
@@ -780,9 +780,9 @@ class ExperimentRunner:
         if result.error:
             print(f"       Error: {result.error}")
 
-    def run(self) -> dict[str, Any]:
+    def run(self) -> Dict[str, Any]:
         """Run all requested experiment suites."""
-        all_results: dict[str, list[ExperimentResult]] = {}
+        all_results: dict[str, List[ExperimentResult]] = {}
 
         suites = {
             "learning": self.run_learning_suite,
@@ -832,7 +832,7 @@ class ExperimentRunner:
             },
         }
 
-    def _save_results(self, all_results: dict[str, list[ExperimentResult]]) -> None:
+    def _save_results(self, all_results: dict[str, List[ExperimentResult]]) -> None:
         """Save results to JSON file."""
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
 

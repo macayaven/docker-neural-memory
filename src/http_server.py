@@ -5,12 +5,10 @@ Provides REST endpoints for the comparison demo.
 Run alongside or instead of the MCP server.
 """
 
-import json
 import logging
 import os
 from typing import Any
 
-import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

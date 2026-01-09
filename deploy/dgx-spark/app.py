@@ -11,6 +11,7 @@ import json
 import os
 import time
 from dataclasses import dataclass, field
+from typing import Optional, Tuple
 
 import gradio as gr
 import requests
@@ -99,7 +100,7 @@ def call_gemma(prompt: str, with_memory_context: str = "") -> tuple[str, float, 
         return f"Error: {e}", 0.0, 0
 
 
-def extract_preference(user_input: str, assistant_response: str) -> tuple[str, str] | None:
+def extract_preference(user_input: str, assistant_response: str) -> Optional[Tuple[str, str]]:
     """Extract preference from interaction."""
     # Simple heuristic: if user corrects or specifies, it's a preference
     keywords = {

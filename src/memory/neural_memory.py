@@ -172,7 +172,7 @@ class NeuralMemory(nn.Module):
             )
 
             with torch.no_grad():
-                for param, grad in zip(self.memory_net.parameters(), grads, strict=True):
+                for param, grad in zip(self.memory_net.parameters(), grads):
                     if grad is not None:
                         param -= self.lr * grad
         except RuntimeError:

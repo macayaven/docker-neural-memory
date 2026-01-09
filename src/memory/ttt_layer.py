@@ -90,7 +90,7 @@ class TTTLayer(nn.Module):
 
             # Update hidden state weights
             with torch.no_grad():
-                for param, grad in zip(hidden_state.parameters(), grads, strict=True):
+                for param, grad in zip(hidden_state.parameters(), grads):
                     param -= self.eta * grad
 
             outputs.append(y_t.detach())

@@ -44,7 +44,7 @@ class TestNeuralMemoryLearning:
 
         # Check weights changed
         weight_changed = False
-        for p, init in zip(memory.memory_net.parameters(), initial_weights, strict=True):
+        for p, init in zip(memory.memory_net.parameters(), initial_weights):
             if not torch.allclose(p, init):
                 weight_changed = True
                 break
@@ -64,7 +64,7 @@ class TestNeuralMemoryLearning:
         memory.infer(pattern)
 
         # Check weights unchanged
-        for p, init in zip(memory.memory_net.parameters(), initial_weights, strict=True):
+        for p, init in zip(memory.memory_net.parameters(), initial_weights):
             assert torch.allclose(p, init), "Weights should not change during infer"
 
     def test_different_patterns_have_different_surprise(self):

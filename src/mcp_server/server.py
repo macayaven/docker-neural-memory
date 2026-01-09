@@ -270,7 +270,7 @@ class NeuralMemoryServer:
             if "weight" in name:
                 # Find strongest connections
                 values, indices = param.abs().flatten().topk(min(top_k, param.numel()))
-                for val, idx in zip(values, indices, strict=True):
+                for val, idx in zip(values, indices):
                     patterns.append(
                         {
                             "description": f"Weight {name}[{idx.item()}]",

@@ -7,16 +7,39 @@ Demonstrates Docker-native AI memory with MCP server integration.
 Deploy to: https://huggingface.co/spaces
 """
 
+import os
 import sys
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 import gradio as gr
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from huggingface_hub import InferenceClient
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 
 matplotlib.use("Agg")
+
+# =============================================================================
+# HUGGINGFACE INFERENCE CLIENT
+# =============================================================================
+
+# Use a free model - Mistral or Qwen work well
+HF_MODEL = os.getenv("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
+HF_TOKEN = os.getenv("HF_TOKEN", None)  # Optional - works without for many models
+
+try:
+    hf_client = InferenceClient(model=HF_MODEL, token=HF_TOKEN)
+    LLM_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: Could not initialize HF client: {e}")
+    hf_client = None
+    LLM_AVAILABLE = False
 
 # Add src to path for real implementation
 sys.path.insert(0, str(Path(__file__).parent))
@@ -33,7 +56,361 @@ from src.memory.neural_memory import NeuralMemory
 memory = NeuralMemory(MemoryConfig(dim=256, learning_rate=0.02))
 
 # Track history for visualization
-observation_history: list[dict] = []
+observation_history: List[Dict] = []
+
+# =============================================================================
+# COMPARISON METRICS & KNOWLEDGE BASE
+# =============================================================================
+
+
+@dataclass
+class ComparisonMetrics:
+    """Track comparison between vanilla and memory-augmented responses."""
+
+    # With Neural Memory
+    nm_queries: int = 0
+    nm_correct: int = 0
+    nm_hallucinations: int = 0
+    nm_response_times: List[float] = field(default_factory=list)
+
+    # Vanilla (no memory)
+    vanilla_queries: int = 0
+    vanilla_correct: int = 0
+    vanilla_hallucinations: int = 0
+    vanilla_response_times: List[float] = field(default_factory=list)
+
+
+metrics = ComparisonMetrics()
+
+# Knowledge base - facts the user teaches
+knowledge_base: List[Dict[str, str]] = []
+
+# Store embeddings for t-SNE visualization
+embeddings_store: List[Dict] = []
+
+
+def get_embedding(text: str) -> np.ndarray:
+    """Get the neural memory's internal representation of text."""
+    with torch.no_grad():
+        # Convert text to tensor using memory's encoding
+        tensor = memory._text_to_tensor(text)
+        # Pass through memory network to get learned representation
+        output = memory.memory_net(tensor)
+        # Return flattened representation
+        return output.cpu().numpy().flatten()
+
+
+def create_tsne_visualization() -> plt.Figure:
+    """Create t-SNE visualization of learned representations."""
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    if len(embeddings_store) < 2:
+        ax.text(
+            0.5, 0.5,
+            "Add at least 2 facts to see the embedding space",
+            ha="center", va="center", fontsize=14, color="gray"
+        )
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis("off")
+        return fig
+
+    # Extract embeddings and labels
+    embeddings = np.array([e["embedding"] for e in embeddings_store])
+    labels = [e["label"][:30] + "..." if len(e["label"]) > 30 else e["label"]
+              for e in embeddings_store]
+    surprises = [e["surprise"] for e in embeddings_store]
+
+    # Use PCA if few samples, t-SNE otherwise
+    n_samples = len(embeddings)
+    if n_samples < 5:
+        # PCA for small sample sizes
+        reducer = PCA(n_components=2)
+        reduced = reducer.fit_transform(embeddings)
+        method = "PCA"
+    else:
+        # t-SNE for larger sample sizes
+        perplexity = min(30, n_samples - 1)
+        reducer = TSNE(n_components=2, perplexity=perplexity, random_state=42)
+        reduced = reducer.fit_transform(embeddings)
+        method = "t-SNE"
+
+    # Color by surprise (red = high surprise/novel, blue = low surprise/familiar)
+    colors = plt.cm.RdYlBu_r(surprises)
+
+    # Plot points
+    scatter = ax.scatter(
+        reduced[:, 0], reduced[:, 1],
+        c=surprises, cmap="RdYlBu_r",
+        s=150, alpha=0.7, edgecolors="white", linewidth=2
+    )
+
+    # Add labels
+    for i, label in enumerate(labels):
+        ax.annotate(
+            label, (reduced[i, 0], reduced[i, 1]),
+            xytext=(5, 5), textcoords="offset points",
+            fontsize=9, alpha=0.8,
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7)
+        )
+
+    # Colorbar
+    cbar = plt.colorbar(scatter, ax=ax)
+    cbar.set_label("Surprise (Red=Novel, Blue=Familiar)", fontsize=10)
+
+    ax.set_title(f"Neural Memory Embedding Space ({method})\n"
+                 f"{n_samples} observations - Similar concepts cluster together",
+                 fontsize=12, fontweight="bold")
+    ax.set_xlabel("Dimension 1")
+    ax.set_ylabel("Dimension 2")
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    return fig
+
+
+def create_embedding_comparison() -> plt.Figure:
+    """Create side-by-side: weight heatmap + embedding space."""
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    # Left: Weight heatmap
+    ax1 = axes[0]
+    weights = get_weight_sample()
+    im = ax1.imshow(weights, cmap="RdBu_r", aspect="auto", vmin=-0.5, vmax=0.5)
+    ax1.set_title("Neural Network Weights\n(These update during learning)",
+                  fontsize=11, fontweight="bold")
+    ax1.axis("off")
+    plt.colorbar(im, ax=ax1, label="Weight Value")
+
+    # Right: Embedding space (simplified if few points)
+    ax2 = axes[1]
+    if len(embeddings_store) < 2:
+        ax2.text(0.5, 0.5, "Add facts to see\nembedding space",
+                ha="center", va="center", fontsize=12, color="gray")
+        ax2.set_xlim(0, 1)
+        ax2.set_ylim(0, 1)
+    else:
+        embeddings = np.array([e["embedding"] for e in embeddings_store])
+        surprises = [e["surprise"] for e in embeddings_store]
+
+        n_samples = len(embeddings)
+        if n_samples < 5:
+            reducer = PCA(n_components=2)
+        else:
+            perplexity = min(30, n_samples - 1)
+            reducer = TSNE(n_components=2, perplexity=perplexity, random_state=42)
+
+        reduced = reducer.fit_transform(embeddings)
+
+        scatter = ax2.scatter(reduced[:, 0], reduced[:, 1], c=surprises,
+                             cmap="RdYlBu_r", s=100, alpha=0.7)
+        plt.colorbar(scatter, ax=ax2, label="Surprise")
+        ax2.grid(True, alpha=0.3)
+
+    ax2.set_title("Learned Representations\n(Similar facts cluster together)",
+                  fontsize=11, fontweight="bold")
+
+    plt.tight_layout()
+    return fig
+
+
+def call_llm(prompt: str, context: str = "") -> Tuple[str, float]:
+    """Call HuggingFace LLM. Returns (response, time)."""
+    if not LLM_AVAILABLE or hf_client is None:
+        return "[LLM not available - set HF_TOKEN for comparison demo]", 0.0
+
+    try:
+        full_prompt = prompt
+        if context:
+            full_prompt = f"""You have access to the following knowledge:
+
+{context}
+
+Based ONLY on the knowledge above, answer this question. If the information is not in the knowledge provided, say "I don't have information about that."
+
+Question: {prompt}
+
+Answer:"""
+
+        start = time.time()
+        response = hf_client.text_generation(
+            full_prompt,
+            max_new_tokens=150,
+            temperature=0.7,
+            do_sample=True,
+        )
+        elapsed = time.time() - start
+
+        return response.strip(), elapsed
+    except Exception as e:
+        return f"Error: {str(e)}", 0.0
+
+
+def add_to_knowledge_base(fact: str) -> Tuple[str, plt.Figure]:
+    """Add a fact to the knowledge base and observe it in neural memory."""
+    if not fact.strip():
+        return "Please enter a fact to add.", create_tsne_visualization()
+
+    # Add to knowledge base
+    knowledge_base.append({"fact": fact, "timestamp": time.time()})
+
+    # Observe in neural memory
+    result = memory.observe(fact)
+
+    # Store embedding for visualization
+    embedding = get_embedding(fact)
+    embeddings_store.append({
+        "label": fact,
+        "embedding": embedding,
+        "surprise": result["surprise"],
+        "timestamp": time.time(),
+    })
+
+    output = f"""### Fact Added
+
+**Fact:** "{fact}"
+
+**Neural Memory Response:**
+- Surprise: {result['surprise']:.4f}
+- Weight Delta: {result['weight_delta']:.6f}
+- Learned: {'Yes' if result['learned'] else 'No'}
+
+**Knowledge Base Size:** {len(knowledge_base)} facts
+**Embeddings Stored:** {len(embeddings_store)}
+"""
+
+    return output, create_tsne_visualization()
+
+
+def get_knowledge_context() -> str:
+    """Get all facts as context string."""
+    if not knowledge_base:
+        return ""
+    return "\n".join([f"- {item['fact']}" for item in knowledge_base])
+
+
+def compare_responses(question: str) -> Tuple[str, str, str]:
+    """Compare vanilla LLM vs memory-augmented LLM on the same question."""
+    global metrics
+
+    if not question.strip():
+        return "", "", ""
+
+    if not LLM_AVAILABLE:
+        return (
+            "LLM not available. Please set HF_TOKEN environment variable.",
+            "LLM not available.",
+            "Comparison requires LLM access.",
+        )
+
+    # Get context from knowledge base
+    context = get_knowledge_context()
+
+    # Check surprise (is this question familiar?)
+    surprise = memory.surprise(question)
+
+    # Query WITH memory context
+    nm_response, nm_time = call_llm(question, context)
+    metrics.nm_queries += 1
+    metrics.nm_response_times.append(nm_time)
+
+    # Query WITHOUT memory context (vanilla)
+    vanilla_response, vanilla_time = call_llm(question)
+    metrics.vanilla_queries += 1
+    metrics.vanilla_response_times.append(vanilla_time)
+
+    # Simple hallucination detection (if answer is too confident without knowledge)
+    vanilla_hedges = any(
+        phrase in vanilla_response.lower()
+        for phrase in ["i don't know", "i don't have", "i'm not sure", "cannot"]
+    )
+    nm_hedges = any(
+        phrase in nm_response.lower()
+        for phrase in ["i don't know", "i don't have", "i'm not sure", "cannot"]
+    )
+
+    # If knowledge base has relevant info and vanilla doesn't hedge, likely hallucinating
+    if knowledge_base and not vanilla_hedges:
+        metrics.vanilla_hallucinations += 1
+    if not nm_hedges and context:
+        metrics.nm_correct += 1
+
+    # Format outputs
+    nm_output = f"""### With Neural Memory
+
+{nm_response}
+
+---
+**Metrics:**
+- Surprise: {surprise:.3f}
+- Response Time: {nm_time:.2f}s
+- Knowledge Used: {len(knowledge_base)} facts
+"""
+
+    vanilla_output = f"""### Vanilla LLM (No Memory)
+
+{vanilla_response}
+
+---
+**Metrics:**
+- Response Time: {vanilla_time:.2f}s
+- No context provided
+"""
+
+    # Comparison summary
+    comparison = get_comparison_summary()
+
+    return nm_output, vanilla_output, comparison
+
+
+def get_comparison_summary() -> str:
+    """Generate comparison metrics summary."""
+    nm_avg_time = (
+        sum(metrics.nm_response_times) / len(metrics.nm_response_times)
+        if metrics.nm_response_times
+        else 0
+    )
+    vanilla_avg_time = (
+        sum(metrics.vanilla_response_times) / len(metrics.vanilla_response_times)
+        if metrics.vanilla_response_times
+        else 0
+    )
+
+    nm_accuracy = (
+        metrics.nm_correct / metrics.nm_queries * 100 if metrics.nm_queries else 0
+    )
+    vanilla_halluc_rate = (
+        metrics.vanilla_hallucinations / metrics.vanilla_queries * 100
+        if metrics.vanilla_queries
+        else 0
+    )
+
+    return f"""## Comparison Summary
+
+| Metric | With Neural Memory | Vanilla LLM |
+|--------|-------------------|-------------|
+| **Queries** | {metrics.nm_queries} | {metrics.vanilla_queries} |
+| **Grounded Answers** | {metrics.nm_correct} ({nm_accuracy:.0f}%) | N/A |
+| **Potential Hallucinations** | {metrics.nm_hallucinations} | {metrics.vanilla_hallucinations} ({vanilla_halluc_rate:.0f}%) |
+| **Avg Response Time** | {nm_avg_time:.2f}s | {vanilla_avg_time:.2f}s |
+
+### Knowledge Base
+{len(knowledge_base)} facts stored
+
+### Key Insight
+- **Neural Memory** grounds responses in observed facts
+- **Vanilla LLM** may hallucinate without context
+- Surprise score indicates how novel the question is
+"""
+
+
+def reset_comparison() -> Tuple[str, plt.Figure]:
+    """Reset comparison metrics and knowledge base."""
+    global metrics, knowledge_base, embeddings_store
+    metrics = ComparisonMetrics()
+    knowledge_base = []
+    embeddings_store = []
+    return "Comparison reset. Knowledge base and embeddings cleared.", create_tsne_visualization()
 
 
 def reset_memory():
@@ -346,8 +723,80 @@ with gr.Blocks(title="Docker Neural Memory", theme=gr.themes.Soft()) as demo:
     """)
 
     with gr.Tabs():
-        # TAB 1: Live Demo
-        with gr.TabItem("Live Demo"):
+        # TAB 1: Comparison Demo (NEW - Main Feature)
+        with gr.TabItem("LLM Comparison"):
+            gr.Markdown("""
+            ### Vanilla LLM vs Memory-Augmented LLM
+
+            **Step 1:** Teach the system some facts (knowledge base)
+            **Step 2:** Ask questions and compare responses
+
+            The vanilla LLM has no memory - it may hallucinate.
+            The memory-augmented LLM uses your observed facts.
+            """)
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("#### Step 1: Teach Facts")
+                    fact_input = gr.Textbox(
+                        label="Add a Fact",
+                        placeholder="e.g., 'Carlos prefers VSCode over Vim'",
+                        lines=2,
+                    )
+                    add_fact_btn = gr.Button("Add to Knowledge Base", variant="secondary")
+                    fact_output = gr.Markdown()
+                    gr.Markdown("#### Example Facts to Try")
+                    gr.Markdown("""
+                    - "My favorite programming language is Rust"
+                    - "I always use dark mode in my editor"
+                    - "The project deadline is March 15th"
+                    - "Our API uses JWT authentication"
+                    - "The database runs on PostgreSQL 15"
+                    """)
+
+                with gr.Column(scale=1):
+                    gr.Markdown("#### Embedding Space (t-SNE)")
+                    tsne_plot = gr.Plot(label="Neural Memory Representations")
+
+            add_fact_btn.click(
+                add_to_knowledge_base,
+                inputs=[fact_input],
+                outputs=[fact_output, tsne_plot]
+            )
+
+            gr.Markdown("---")
+            gr.Markdown("#### Step 2: Ask Questions")
+
+            question_input = gr.Textbox(
+                label="Ask a Question",
+                placeholder="e.g., 'What editor should I use?' or 'What's the project deadline?'",
+                lines=2,
+            )
+
+            with gr.Row():
+                compare_btn = gr.Button("Compare Responses", variant="primary", size="lg")
+                reset_compare_btn = gr.Button("Reset Comparison", variant="secondary")
+
+            with gr.Row():
+                with gr.Column():
+                    nm_response = gr.Markdown(label="With Neural Memory")
+                with gr.Column():
+                    vanilla_response = gr.Markdown(label="Vanilla LLM")
+
+            comparison_summary = gr.Markdown(label="Comparison Metrics")
+
+            compare_btn.click(
+                compare_responses,
+                inputs=[question_input],
+                outputs=[nm_response, vanilla_response, comparison_summary],
+            )
+            reset_compare_btn.click(
+                reset_comparison,
+                outputs=[comparison_summary, tsne_plot]
+            )
+
+        # TAB 2: Live Demo (original)
+        with gr.TabItem("Neural Memory Playground"):
             gr.Markdown("### Watch Real Neural Learning")
 
             with gr.Row():

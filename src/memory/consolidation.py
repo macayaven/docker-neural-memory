@@ -5,6 +5,8 @@ Like sleep for neural memory: strengthens important patterns,
 prunes noise, and prevents catastrophic forgetting.
 """
 
+from typing import Dict, List, Union
+
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -25,10 +27,10 @@ class MemoryConsolidator:
             ewc_lambda: Weight for EWC penalty term
         """
         self.ewc_lambda = ewc_lambda
-        self.fisher: dict[str, Tensor] = {}
-        self.optimal: dict[str, Tensor] = {}
+        self.fisher: Dict[str, Tensor] = {}
+        self.optimal: Dict[str, Tensor] = {}
 
-    def compute_fisher(self, model: nn.Module, data_loader: list[Tensor]) -> None:
+    def compute_fisher(self, model: nn.Module, data_loader: List[Tensor]) -> None:
         """
         Compute Fisher information matrix for EWC.
 
@@ -81,8 +83,8 @@ class MemoryConsolidator:
         return current_loss + self.ewc_lambda * ewc_penalty
 
     def consolidate(
-        self, model: nn.Module, recent_observations: list[Tensor]
-    ) -> dict[str, int | float]:
+        self, model: nn.Module, recent_observations: List[Tensor]
+    ) -> Dict[str, Union[int, float]]:
         """
         Perform consolidation pass.
 
