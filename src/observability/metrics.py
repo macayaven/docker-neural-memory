@@ -87,7 +87,9 @@ class MemoryObserver:
         """
         self.memory = memory
         self.langfuse = langfuse
-        self.session_id = session_id or f"session_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        self.session_id = (
+            session_id or f"session_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        )
 
         # Local metrics storage
         self._observations: list[MetricsSnapshot] = []
