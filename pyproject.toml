@@ -53,7 +53,7 @@ packages = ["src"]
 # Ruff replaces black, flake8, isort
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = [
@@ -81,7 +81,12 @@ select = [
 ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # function calls in argument defaults
+    "B905",   # zip() without strict= (Python 3.10+)
     "ISC001", # conflicts with formatter
+    "UP006",  # Use dict instead of Dict (Python 3.9 compat)
+    "UP007",  # Use X | Y for Union (Python 3.10+)
+    "UP035",  # typing.Dict deprecated (Python 3.9 compat)
+    "UP045",  # Use X | None for Optional (Python 3.10+)
 ]
 
 [tool.ruff.lint.isort]
@@ -93,7 +98,7 @@ indent-style = "space"
 
 # MyPy for type checking
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.9"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
@@ -103,7 +108,7 @@ check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["torch.*", "transformers.*", "edge_tts.*", "gradio.*", "langfuse.*", "pydantic_settings", "pydantic_settings.*"]
+module = ["torch.*", "transformers.*", "edge_tts.*", "gradio.*", "langfuse.*", "pydantic_settings", "pydantic_settings.*", "fastapi.*", "uvicorn.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -115,6 +120,11 @@ disable_error_code = ["misc"]
 module = ["src.observability.metrics"]
 # Langfuse SDK doesn't have complete type stubs
 disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = ["src.http_server"]
+# FastAPI decorators are untyped
+disable_error_code = ["misc", "untyped-decorator"]
 
 # Pytest configuration
 [tool.pytest.ini_options]

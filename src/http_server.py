@@ -7,7 +7,7 @@ Run alongside or instead of the MCP server.
 
 import logging
 import os
-from typing import Any
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,7 +43,7 @@ logger.info(f"Neural Memory HTTP API initialized: dim={config.dim}, lr={config.l
 # Request/Response models
 class ObserveRequest(BaseModel):
     content: str
-    learning_rate: float | None = None
+    learning_rate: Optional[float] = None
 
 
 class SurpriseRequest(BaseModel):
@@ -73,7 +73,7 @@ class StatsResponse(BaseModel):
 
 # Endpoints
 @app.get("/health")
-async def health() -> dict[str, Any]:
+async def health() -> Dict[str, Any]:
     """Health check endpoint."""
     return {
         "status": "healthy",
@@ -98,7 +98,7 @@ async def observe(request: ObserveRequest) -> ObserveResponse:
         )
     except Exception as e:
         logger.error(f"Observe error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/surprise", response_model=SurpriseResponse)
@@ -117,7 +117,7 @@ async def surprise(request: SurpriseRequest) -> SurpriseResponse:
         return SurpriseResponse(surprise=score, recommendation=recommendation)
     except Exception as e:
         logger.error(f"Surprise error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/stats", response_model=StatsResponse)
@@ -135,11 +135,11 @@ async def stats() -> StatsResponse:
         )
     except Exception as e:
         logger.error(f"Stats error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/reset")
-async def reset() -> dict[str, str]:
+async def reset() -> Dict[str, str]:
     """Reset memory to initial state."""
     global memory
     memory = NeuralMemory(config)
