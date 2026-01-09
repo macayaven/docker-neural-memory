@@ -218,7 +218,7 @@ HEADER_HTML = '''
                     margin: 5px 0 0 0;
                     font-size: 1.1em;
                     font-weight: 300;
-                ">Real Test-Time Training — Not a Simulation</p>
+                ">Test-Time Training: Evolving LLMs from data hoarders to knowledge creators</p>
             </div>
         </div>
 
